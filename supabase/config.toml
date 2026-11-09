@@ -1,0 +1,3 @@
+# Local Supabase project identifier. Link to your own remote project with
+# `supabase link --project-ref <YOUR_PROJECT_REF>`.
+project_id = "canpreciseai-hmis"
