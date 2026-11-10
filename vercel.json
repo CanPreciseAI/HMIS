@@ -1,0 +1,10 @@
+{
+  "framework": "vite",
+  "buildCommand": "NITRO_OUTPUT_DIR=dist npm run build",
+  "outputDirectory": "dist",
+  "frameworkSettings": {
+    "vite": {
+      "rootDist": "dist"
+    }
+  }
+}
