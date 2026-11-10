@@ -6,6 +6,7 @@ import { defineConfig, loadEnv } from "vite";
 
 export default defineConfig(({ command, mode }) => {
   const fileEnv = loadEnv(mode, process.cwd(), "");
+
   for (const name of [
     "SUPABASE_URL",
     "SUPABASE_PUBLISHABLE_KEY",
@@ -18,7 +19,19 @@ export default defineConfig(({ command, mode }) => {
     }
   }
 
+  const onVercel = Boolean(process.env["VERCEL"]);
   const outputDir = process.env["NITRO_OUTPUT_DIR"] ?? ".output";
+
+  const nitroOptions = onVercel
+    ? { preset: "vercel" }
+    : {
+        preset: "cloudflare-module",
+        output: {
+          dir: outputDir,
+          serverDir: `${outputDir}/server`,
+          publicDir: `${outputDir}/public`,
+        },
+      };
 
   return {
     plugins: [
@@ -30,19 +43,7 @@ export default defineConfig(({ command, mode }) => {
         },
         server: { entry: "server" },
       }),
-      ...(command === "build"
-        ? [
-            const nitroPreset = process.env.VERCEL ? "vercel" : "cloudflare-module";
-            nitro({
-              preset: nitroPreset,
-              output: {
-                dir: outputDir,
-                serverDir: `${outputDir}/server`,
-                publicDir: `${outputDir}/public`,
-              },
-            }),
-          ]
-        : []),
+      ...(command === "build" ? [nitro(nitroOptions)] : []),
       react(),
     ],
     resolve: { tsconfigPaths: true },
