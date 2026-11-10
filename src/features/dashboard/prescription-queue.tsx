@@ -27,6 +27,17 @@ function formatQuantity(value: number) {
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+function prescriberDetails(row: PrescriptionLine) {
+  return [
+    row.prescriber,
+    row.prescriberDepartment,
+    row.prescriberSpecialization,
+    row.prescriberCode,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function stockTone(row: PrescriptionLine) {
   if (!row.stockLinked) {
     return "bg-muted text-muted-foreground ring-border";
@@ -286,8 +297,11 @@ export function PrescriptionQueuePanel({ ctx }: { ctx: StaffContext }) {
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {formatQuantity(row.dispensed)} of{" "}
                         {formatQuantity(row.prescribed)} dispensed ·{" "}
-                        {formatQuantity(row.remaining)} left to dispense ·{" "}
-                        {row.prescriber} · {formatDate(row.prescribedAt)}
+                        {formatQuantity(row.remaining)} left to dispense
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Prescribed by {prescriberDetails(row)} ·{" "}
+                        {formatDate(row.prescribedAt)}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                         <span

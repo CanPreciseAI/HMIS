@@ -281,7 +281,15 @@ function PharmacyOverview({ data }: { data: PharmacistData }) {
                       {row.remaining} of {row.prescribed} remaining
                     </p>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {row.prescriber} · {formatDate(row.prescribedAt)}
+                      {row.prescriber}
+                      {row.prescriberDepartment
+                        ? ` · ${row.prescriberDepartment}`
+                        : ""}
+                      {row.prescriberSpecialization
+                        ? ` · ${row.prescriberSpecialization}`
+                        : ""}
+                      {row.prescriberCode ? ` · ${row.prescriberCode}` : ""} ·{" "}
+                      {formatDate(row.prescribedAt)}
                     </p>
                   </div>
                   <StatusPill status="open" />

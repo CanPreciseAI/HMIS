@@ -109,6 +109,9 @@ import { PrescriptionQueuePanel } from "@/features/dashboard/prescription-queue"
 import { PharmacyStockPanel } from "@/features/dashboard/pharmacy-stock";
 import { PaymentLedgerPanel } from "@/features/dashboard/payment-ledger";
 import { PrescriptionWriterPanel } from "@/features/dashboard/prescription-writer";
+import { PrescriptionHistoryPanel } from "@/features/dashboard/prescription-history";
+import { YourPatientsPanel } from "@/features/dashboard/patient-history";
+import { LabAssignmentsPanel } from "@/features/dashboard/lab-assignments";
 import { buildSectionNotifications } from "@/features/dashboard/section-notifications";
 import { HandoffNotePanel } from "@/features/dashboard/handoff-note";
 import {
@@ -135,9 +138,11 @@ type Section =
   | "doctor-appointments"
   | "today-schedule"
   | "your-patients"
+  | "lab-assignments"
   | "results-to-review"
   | "recent-notes"
   | "write-prescription"
+  | "prescription-history"
   | "care-queue"
   | "handoff-notes"
   | "sample-queue"
@@ -227,10 +232,17 @@ const SECTION_DETAILS: Record<
     title: "Your patients",
     subtitle: "Recent encounters assigned to your care.",
   },
+  "lab-assignments": {
+    role: ["doctor"],
+    title: "Lab assignments",
+    subtitle:
+      "Assign patients to a lab technician for the tests they need, and review their results.",
+  },
   "results-to-review": {
     role: ["doctor"],
-    title: "Results to review",
-    subtitle: "Critical laboratory results requiring clinical attention.",
+    title: "Lab assignments",
+    subtitle:
+      "Assign patients to a lab technician for the tests they need, and review their results.",
   },
   "recent-notes": {
     role: ["doctor"],
@@ -242,6 +254,12 @@ const SECTION_DETAILS: Record<
     title: "Write prescription",
     subtitle:
       "Prescribe medicines for a patient — every line goes straight to the pharmacy.",
+  },
+  "prescription-history": {
+    role: ["doctor"],
+    title: "Prescription history",
+    subtitle:
+      "Review prescriptions you sent to the pharmacy and their dispensing progress.",
   },
   "care-queue": {
     role: ["nurse"],
@@ -309,6 +327,7 @@ const SECTION_DETAILS: Record<
   "service-charges": {
     role: [
       "hospital_admin",
+      "doctor",
       "nurse",
       "lab_technician",
       "pharmacist",
@@ -316,7 +335,7 @@ const SECTION_DETAILS: Record<
     ],
     title: "Billing",
     subtitle:
-      "Services and charges, invoices and payments in one place for this facility.",
+      "Add the services you provide and track them in the shared patient billing ledger.",
   },
   "reception-billing": {
     role: ["receptionist"],
@@ -1100,6 +1119,9 @@ function SectionContent({
   if (section === "write-prescription") {
     return <PrescriptionWriterPanel ctx={ctx} />;
   }
+  if (section === "prescription-history") {
+    return <PrescriptionHistoryPanel ctx={ctx} />;
+  }
   if (section === "billing" && ctx.role === "hospital_admin") {
     return (
       <div className="space-y-5">
@@ -1235,53 +1257,18 @@ function SectionContent({
     "openEncounters" in data
   ) {
     return (
-      <Panel
-        title="Recent patient encounters"
-        subtitle={`${data.openEncounters} encounters currently open`}
-      >
-        {data.patients.length ? (
-          data.patients.map((row) => (
-            <LinkRow
-              key={row.id}
-              label={row.name}
-              value={row.status.replaceAll("_", " ")}
-              hint={`${row.number ?? "No MRN"} · ${row.detail}`}
-            />
-          ))
-        ) : (
-          <EmptyState
-            icon={Users}
-            title="No encounters yet"
-            description="Patients you open an encounter for will be listed here."
-          />
-        )}
-      </Panel>
+      <YourPatientsPanel
+        ctx={ctx}
+        patients={data.patients}
+        openEncounters={data.openEncounters}
+      />
     );
   }
-  if (section === "results-to-review" && "critical" in data) {
-    return (
-      <Panel
-        title="Critical laboratory results"
-        subtitle="Flagged results with patient and acknowledgement details"
-      >
-        {data.critical.length ? (
-          data.critical.map((row) => (
-            <LinkRow
-              key={row.id}
-              label={`${row.test} · ${row.patient}`}
-              value={`${row.value}${row.unit ? ` ${row.unit}` : ""}`}
-              hint={`${row.acknowledged ? "Acknowledged" : "Needs acknowledgement"}${row.at ? ` · ${new Date(row.at).toLocaleString()}` : ""}`}
-            />
-          ))
-        ) : (
-          <EmptyState
-            icon={FlaskConical}
-            title="No critical results"
-            description="Critical laboratory results requiring review will appear here."
-          />
-        )}
-      </Panel>
-    );
+  if (
+    (section === "lab-assignments" || section === "results-to-review") &&
+    "critical" in data
+  ) {
+    return <LabAssignmentsPanel ctx={ctx} criticalResults={data.critical} />;
   }
   if (section === "recent-notes" && "notes" in data) {
     return (

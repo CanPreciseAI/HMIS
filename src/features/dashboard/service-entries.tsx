@@ -9,6 +9,7 @@ import { CheckCheck, ClipboardList, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import {
   confirmServiceCharge,
+  createInvoiceFromCharges,
   formatDate,
   humanise,
   loadInvoiceChargeOptions,
@@ -47,10 +48,9 @@ const STATUS_CLASS: Record<string, string> = {
 };
 
 /**
- * The billing desk for every staff role except doctors: choose a patient, add
- * the service or item you provided, and see everything else recorded for that
- * patient. Entries stay open until an administrator or receptionist marks them
- * complete.
+ * The billing desk for every staff role: choose a patient, add the service or
+ * item you provided, and see everything else recorded for that patient. Entries
+ * stay open until an administrator or receptionist marks them complete.
  */
 export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
   const [patients, setPatients] = useState<InvoicePatientOption[]>([]);
@@ -72,8 +72,14 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
   const [medicineNote, setMedicineNote] = useState("");
   const [medicineSaving, setMedicineSaving] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [billableIds, setBillableIds] = useState<string[]>([]);
+  const [discount, setDiscount] = useState("0");
+  const [tax, setTax] = useState("0");
+  const [billing, setBilling] = useState(false);
+  const [invoiceVersion, setInvoiceVersion] = useState(0);
 
   const isPharmacist = ctx.role === "pharmacist";
+  const isReceptionist = ctx.role === "receptionist";
   const canMark = canMarkEntries(ctx.role);
 
   const refresh = useCallback(async () => {
@@ -109,6 +115,10 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    setBillableIds([]);
+  }, [patientId]);
+
   const selectedPatient = patients.find((row) => row.id === patientId) ?? null;
   const patientEntries = useMemo(
     () => entries.filter((row) => row.patientId === patientId),
@@ -117,6 +127,16 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
   const pendingCount = patientEntries.filter(
     (row) => row.status === "recorded" && !row.confirmedAt,
   ).length;
+  const billableEntries = useMemo(
+    () => patientEntries.filter((row) => row.status === "recorded"),
+    [patientEntries],
+  );
+  const billSubtotal = billableEntries
+    .filter((row) => billableIds.includes(row.id))
+    .reduce((sum, row) => sum + row.amount, 0);
+  const discountValue = Number(discount) || 0;
+  const taxValue = Number(tax) || 0;
+  const billTotal = Math.max(0, billSubtotal - discountValue + taxValue);
   const selectedService =
     services.find((service) => service.id === serviceId) ?? null;
   const selectedMedicine =
@@ -194,6 +214,51 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
       );
     } finally {
       setMedicineSaving(false);
+    }
+  }
+
+  async function issueInvoice(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!patientId) {
+      toast.error("Choose a patient first.");
+      return;
+    }
+    if (billableIds.length === 0) {
+      toast.error("Select at least one recorded charge to include.");
+      return;
+    }
+    if (
+      !Number.isFinite(discountValue) ||
+      discountValue < 0 ||
+      !Number.isFinite(taxValue) ||
+      taxValue < 0
+    ) {
+      toast.error("Discount and tax must be zero or more.");
+      return;
+    }
+
+    setBilling(true);
+    try {
+      const invoice = await createInvoiceFromCharges(ctx, {
+        patientId,
+        chargeIds: billableIds,
+        discountAmount: discountValue,
+        taxAmount: taxValue,
+      });
+      toast.success(
+        `Invoice ${invoice.invoiceNumber} issued for ${money(invoice.netAmount)}`,
+      );
+      setBillableIds([]);
+      setDiscount("0");
+      setTax("0");
+      setInvoiceVersion((current) => current + 1);
+      await refresh();
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error ? cause.message : "Could not issue the invoice.",
+      );
+    } finally {
+      setBilling(false);
     }
   }
 
@@ -503,7 +568,109 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
           </div>
         )}
       </Panel>
-      {ctx.role === "receptionist" && <ReceptionInvoicePanel ctx={ctx} />}
+      {isReceptionist && (
+        <Panel
+          title="Create invoice"
+          subtitle="Select the recorded charges for this patient and issue one invoice. Pick one actor's charges to keep their invoice separate, or combine several actors into a single bill."
+        >
+          {billableEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No uninvoiced charges for{" "}
+              {selectedPatient?.name ?? "this patient"} right now.
+            </p>
+          ) : (
+            <form
+              onSubmit={(event) => void issueInvoice(event)}
+              className="space-y-4"
+            >
+              <ul className="divide-y divide-border rounded-xl border border-border">
+                {billableEntries.map((row) => (
+                  <li key={row.id}>
+                    <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={billableIds.includes(row.id)}
+                        onChange={() =>
+                          setBillableIds((current) =>
+                            current.includes(row.id)
+                              ? current.filter((id) => id !== row.id)
+                              : [...current, row.id],
+                          )
+                        }
+                        disabled={billing}
+                        className="mt-0.5 size-4 rounded border-input accent-primary"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-foreground">
+                          {row.service} · {money(row.amount)}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {humanise(row.recordedRole)} {row.recordedBy} ·{" "}
+                          {formatDate(row.createdAt)}
+                          {row.note ? ` · ${row.note}` : ""}
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="text-xs font-medium text-foreground">
+                  Discount (₹)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={discount}
+                    onChange={(event) => setDiscount(event.currentTarget.value)}
+                    disabled={billing}
+                    className={fieldClass}
+                  />
+                </label>
+                <label className="text-xs font-medium text-foreground">
+                  Tax (₹)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={tax}
+                    onChange={(event) => setTax(event.currentTarget.value)}
+                    disabled={billing}
+                    className={fieldClass}
+                  />
+                </label>
+                <div className="flex items-end justify-between gap-3 sm:col-span-1">
+                  <div className="text-xs text-muted-foreground">
+                    <p>Selected {money(billSubtotal)}</p>
+                    <p className="font-semibold text-foreground">
+                      Total {money(billTotal)}
+                    </p>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={billing || billableIds.length === 0}
+                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+                  >
+                    {billing ? (
+                      <Loader2
+                        className="size-4 animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Send className="size-4" aria-hidden="true" />
+                    )}
+                    Issue invoice
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+        </Panel>
+      )}
+      {isReceptionist && (
+        <ReceptionInvoicePanel key={invoiceVersion} ctx={ctx} />
+      )}
     </div>
   );
 }

@@ -262,6 +262,19 @@ export function buildSectionNotifications(
         }
       }
       break;
+    case "lab-assignments":
+      if (doctor?.labAssignments) {
+        items.push(
+          notification(
+            "doctor-lab-assignments",
+            `${doctor.labAssignments} lab assignment${doctor.labAssignments === 1 ? "" : "s"} with the laboratory`,
+            "Tests you assigned are waiting in the lab queue.",
+            "info",
+            "/dashboard/lab-assignments",
+          ),
+        );
+      }
+      break;
     case "results-to-review":
       if (doctor?.resultsToReview) {
         items.push(
@@ -270,7 +283,7 @@ export function buildSectionNotifications(
             `${doctor.resultsToReview} lab result${doctor.resultsToReview === 1 ? "" : "s"} to review`,
             "Preliminary results are waiting for your review.",
             "warning",
-            "/dashboard/results-to-review",
+            "/dashboard/lab-assignments",
           ),
         );
       }

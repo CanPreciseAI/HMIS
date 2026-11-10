@@ -1088,6 +1088,9 @@ export type PharmacistData = {
     remaining: number;
     prescribed: number;
     prescriber: string;
+    prescriberDepartment: string | null;
+    prescriberSpecialization: string | null;
+    prescriberCode: string | null;
     prescribedAt: string;
   }[];
   recentDispenses: {
@@ -1406,6 +1409,11 @@ export async function loadLabTechnicianData(
       .select("id, patient_id, ordered_at")
       .eq("tenant_id", tenantId)
       .in("status", ["placed", "in_progress"])
+      .or(
+        ctx.employeeId
+          ? `assigned_to.is.null,assigned_to.eq.${ctx.employeeId}`
+          : "assigned_to.is.null",
+      )
       .order("ordered_at", { ascending: true }),
     supabase
       .from("lab_results")
@@ -1530,6 +1538,179 @@ export async function loadLabTechnicianData(
       };
     }),
   };
+}
+
+export type LabAssignmentPriority = "routine" | "urgent" | "stat";
+
+export type LabTestOption = {
+  id: string;
+  code: string;
+  name: string;
+  specimenType: string;
+};
+
+export type LabTechnicianOption = {
+  id: string;
+  name: string;
+};
+
+export type LabAssignmentRow = {
+  id: string;
+  patient: string;
+  patientNumber: string | null;
+  tests: string[];
+  technician: string;
+  priority: string;
+  status: string;
+  orderedAt: string;
+};
+
+export type LabAssignmentWorkspace = {
+  patients: InvoicePatientOption[];
+  tests: LabTestOption[];
+  technicians: LabTechnicianOption[];
+  assignments: LabAssignmentRow[];
+};
+
+export async function loadLabAssignmentWorkspace(
+  ctx: StaffContext,
+): Promise<LabAssignmentWorkspace> {
+  const { tenantId, facilityId } = requireTenantAndFacility(
+    ctx,
+    "lab assignment workspace",
+  );
+
+  const ordersPromise = ctx.employeeId
+    ? supabase
+        .from("lab_orders")
+        .select("id, patient_id, ordered_at, status, assigned_to")
+        .eq("tenant_id", tenantId)
+        .eq("ordered_by", ctx.employeeId)
+        .order("ordered_at", { ascending: false })
+        .limit(50)
+    : Promise.resolve({
+        data: [] as {
+          id: string;
+          patient_id: string;
+          ordered_at: string;
+          status: string;
+          assigned_to: string | null;
+        }[],
+        error: null,
+      });
+
+  const [patientRows, testRes, technicianRes, orderRes] = await Promise.all([
+    loadInvoicePatientOptions(ctx),
+    supabase
+      .from("lab_test_catalog")
+      .select("id, test_code, name, specimen_type")
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .order("name", { ascending: true })
+      .limit(500),
+    supabase.rpc("facility_lab_technicians", { _facility_id: facilityId }),
+    ordersPromise,
+  ]);
+  throwQueryErrors("lab assignment options", testRes, technicianRes, orderRes);
+
+  const orders = orderRes.data ?? [];
+  const orderIds = orders.map((order) => order.id);
+  const [itemRes, patients] = await Promise.all([
+    orderIds.length
+      ? supabase
+          .from("lab_order_items")
+          .select("lab_order_id, test_id, priority, status")
+          .in("lab_order_id", orderIds)
+          .order("created_at", { ascending: true })
+          .limit(200)
+      : Promise.resolve({
+          data: [] as {
+            lab_order_id: string;
+            test_id: string;
+            priority: string;
+            status: string;
+          }[],
+          error: null,
+        }),
+    patientLookup(
+      orders.map((order) => order.patient_id),
+      tenantId,
+    ),
+  ]);
+  throwQueryErrors("lab assignment details", itemRes);
+
+  const items = itemRes.data ?? [];
+  const tests = new Map(
+    (testRes.data ?? []).map((test) => [
+      test.id,
+      { code: test.test_code, name: test.name },
+    ]),
+  );
+  const technicians = new Map(
+    (technicianRes.data ?? []).map((technician) => [
+      technician.employee_id,
+      technician.full_name,
+    ]),
+  );
+  const itemsByOrder = new Map<string, typeof items>();
+  for (const item of items) {
+    const current = itemsByOrder.get(item.lab_order_id) ?? [];
+    current.push(item);
+    itemsByOrder.set(item.lab_order_id, current);
+  }
+
+  return {
+    patients: patientRows,
+    tests: (testRes.data ?? []).map((test) => ({
+      id: test.id,
+      code: test.test_code,
+      name: test.name,
+      specimenType: test.specimen_type,
+    })),
+    technicians: (technicianRes.data ?? []).map((technician) => ({
+      id: technician.employee_id,
+      name: technician.full_name,
+    })),
+    assignments: orders.map((order) => {
+      const orderItems = itemsByOrder.get(order.id) ?? [];
+      return {
+        id: order.id,
+        patient: patients.get(order.patient_id)?.name ?? "Patient",
+        patientNumber: patients.get(order.patient_id)?.number ?? null,
+        tests: orderItems.map(
+          (item) => tests.get(item.test_id)?.name ?? "Lab test",
+        ),
+        technician:
+          (order.assigned_to && technicians.get(order.assigned_to)) ??
+          "Lab technician",
+        priority: orderItems[0]?.priority ?? "routine",
+        status: order.status,
+        orderedAt: order.ordered_at,
+      };
+    }),
+  };
+}
+
+export async function createLabAssignment(input: {
+  patientId: string;
+  testIds: string[];
+  technicianId: string;
+  priority: LabAssignmentPriority;
+}): Promise<{ labOrderId: string; itemCount: number }> {
+  const { data, error } = await supabase.rpc("create_lab_assignment", {
+    _patient_id: input.patientId,
+    _test_ids: input.testIds,
+    _assigned_to: input.technicianId,
+    _priority: input.priority,
+  });
+  if (error) {
+    throw new Error(`Could not assign the lab tests: ${error.message}`);
+  }
+  const row = data?.[0];
+  if (!row) {
+    throw new Error("Could not assign the lab tests.");
+  }
+  return { labOrderId: row.lab_order_id, itemCount: row.item_count };
 }
 
 export async function loadPharmacistData(
@@ -1733,6 +1914,9 @@ export async function loadPharmacistData(
       remaining: line.remaining,
       prescribed: line.prescribed,
       prescriber: line.prescriber,
+      prescriberDepartment: line.prescriberDepartment,
+      prescriberSpecialization: line.prescriberSpecialization,
+      prescriberCode: line.prescriberCode,
       prescribedAt: line.prescribedAt,
     })),
     recentDispenses: dispenseRows
@@ -1928,6 +2112,19 @@ export type DoctorAppointment = {
   respondedAt: string | null;
 };
 
+export type DoctorScheduleEntry = {
+  id: string;
+  at: string;
+  patient: string;
+  number: string | null;
+  durationMinutes: number;
+  status: string;
+  appointmentType: string;
+  reason: string | null;
+  location: string | null;
+  response: string;
+};
+
 type DoctorPatientDetail = {
   id: string;
   name: string;
@@ -2014,6 +2211,57 @@ export async function loadDoctorAppointments(
       respondedAt: row.doctor_responded_at,
     };
   });
+}
+
+/**
+ * Appointments for one month of the signed-in doctor's calendar. Completed
+ * visits are kept so past days still show how busy the clinic was.
+ */
+export async function loadDoctorScheduleMonth(
+  ctx: StaffContext,
+  month: string,
+): Promise<DoctorScheduleEntry[]> {
+  if (!ctx.tenantId || !ctx.facilityId || !ctx.employeeId) return [];
+  const start = new Date(`${month}-01T00:00:00`);
+  if (Number.isNaN(start.getTime())) {
+    throw new Error("Could not load your schedule: invalid month.");
+  }
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + 1);
+
+  const { data, error } = await supabase
+    .from("appointments")
+    .select(
+      "id, patient_id, scheduled_at, duration_minutes, status, appointment_type, reason, location, doctor_response",
+    )
+    .eq("tenant_id", ctx.tenantId)
+    .eq("facility_id", ctx.facilityId)
+    .eq("provider_id", ctx.employeeId)
+    .gte("scheduled_at", start.toISOString())
+    .lt("scheduled_at", end.toISOString())
+    .in("status", ["scheduled", "checked_in", "completed"])
+    .order("scheduled_at", { ascending: true })
+    .limit(200);
+  if (error) {
+    throw new Error(`Could not load your schedule: ${error.message}`);
+  }
+
+  const patients = await patientLookup(
+    (data ?? []).map((row) => row.patient_id),
+    ctx.tenantId,
+  );
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    at: row.scheduled_at,
+    patient: patients.get(row.patient_id)?.name ?? "Patient",
+    number: patients.get(row.patient_id)?.number ?? null,
+    durationMinutes: row.duration_minutes,
+    status: row.status,
+    appointmentType: row.appointment_type,
+    reason: row.reason,
+    location: row.location,
+    response: row.doctor_response,
+  }));
 }
 
 export async function respondToAppointment(
@@ -2659,6 +2907,10 @@ export type PrescriptionLine = {
   patient: string;
   patientNumber: string | null;
   prescriber: string;
+  prescriberId: string | null;
+  prescriberDepartment: string | null;
+  prescriberSpecialization: string | null;
+  prescriberCode: string | null;
   dose: string;
   route: string;
   frequency: string;
@@ -2737,6 +2989,10 @@ export async function loadFacilityPrescriptionLines(
     patient: row.patient_name,
     patientNumber: row.patient_number,
     prescriber: row.prescriber_name,
+    prescriberId: row.prescriber_id,
+    prescriberDepartment: row.prescriber_department,
+    prescriberSpecialization: row.prescriber_specialization,
+    prescriberCode: row.prescriber_code,
     dose: row.dose,
     route: row.route,
     frequency: row.frequency,
@@ -2754,6 +3010,168 @@ export async function loadFacilityPrescriptionLines(
         : Number(row.last_dispensed_quantity),
     lastDispensedAt: row.last_dispensed_at,
   }));
+}
+
+export type DoctorPrescriptionHistoryItem = {
+  id: string;
+  medicine: string;
+  dose: string;
+  route: string;
+  frequency: string;
+  duration: string;
+  prescribed: number;
+  dispensed: number;
+  remaining: number;
+  status: string;
+};
+
+export type DoctorPrescriptionHistoryRow = {
+  id: string;
+  patient: string;
+  patientNumber: string | null;
+  prescribedAt: string;
+  status: string;
+  prescriberName: string;
+  prescriberDepartment: string | null;
+  prescriberSpecialization: string | null;
+  prescriberCode: string | null;
+  items: DoctorPrescriptionHistoryItem[];
+};
+
+/**
+ * The prescriptions this doctor wrote, newest first. Prescriptions are scoped
+ * to the current facility through their encounter, and each line carries its
+ * own dispensing progress so the doctor can follow the pharmacy hand-off.
+ */
+export async function loadDoctorPrescriptionHistory(
+  ctx: StaffContext,
+): Promise<DoctorPrescriptionHistoryRow[]> {
+  const { tenantId, facilityId } = requireTenantAndFacility(
+    ctx,
+    "prescription history",
+  );
+  const employeeId = ctx.employeeId;
+  if (!employeeId) return [];
+
+  const { data, error } = await supabase
+    .from("prescriptions")
+    .select("id, encounter_id, status, created_at")
+    .eq("prescriber_id", employeeId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) {
+    throw new Error(`Could not load your prescriptions: ${error.message}`);
+  }
+
+  const prescriptions = data ?? [];
+  if (!prescriptions.length) return [];
+
+  const encounterRes = await supabase
+    .from("encounters")
+    .select("id, patient_id")
+    .eq("tenant_id", tenantId)
+    .eq("facility_id", facilityId)
+    .in("id", [...new Set(prescriptions.map((row) => row.encounter_id))]);
+  if (encounterRes.error) {
+    throw new Error(
+      `Could not load prescription encounters: ${encounterRes.error.message}`,
+    );
+  }
+
+  const encounterById = new Map(
+    (encounterRes.data ?? []).map((encounter) => [encounter.id, encounter]),
+  );
+  const visible = prescriptions.filter((prescription) =>
+    encounterById.has(prescription.encounter_id),
+  );
+  if (!visible.length) return [];
+
+  const [patients, itemRes] = await Promise.all([
+    patientLookup(
+      visible.map(
+        (prescription) =>
+          encounterById.get(prescription.encounter_id)?.patient_id,
+      ),
+      tenantId,
+    ),
+    supabase
+      .from("prescription_items")
+      .select(
+        "id, prescription_id, medicine_id, dose, route, frequency, duration, quantity_prescribed, quantity_dispensed",
+      )
+      .in(
+        "prescription_id",
+        visible.map((prescription) => prescription.id),
+      )
+      .order("created_at", { ascending: true }),
+  ]);
+  if (itemRes.error) {
+    throw new Error(
+      `Could not load your prescription lines: ${itemRes.error.message}`,
+    );
+  }
+
+  const items = itemRes.data ?? [];
+  const medicineRes = items.length
+    ? await supabase
+        .from("medicine_catalog")
+        .select("id, name, strength")
+        .eq("tenant_id", tenantId)
+        .in("id", [...new Set(items.map((item) => item.medicine_id))])
+    : { data: [], error: null };
+  if (medicineRes.error) {
+    throw new Error(
+      `Could not load your prescription medicines: ${medicineRes.error.message}`,
+    );
+  }
+
+  const medicineNames = new Map(
+    (medicineRes.data ?? []).map((medicine) => [
+      medicine.id,
+      `${medicine.name} ${medicine.strength}`,
+    ]),
+  );
+  const itemsByPrescription = new Map<
+    string,
+    DoctorPrescriptionHistoryItem[]
+  >();
+  for (const item of items) {
+    const prescribed = Number(item.quantity_prescribed);
+    const dispensed = Number(item.quantity_dispensed);
+    const remaining = Math.max(prescribed - dispensed, 0);
+    const lines = itemsByPrescription.get(item.prescription_id) ?? [];
+    lines.push({
+      id: item.id,
+      medicine: medicineNames.get(item.medicine_id) ?? "Medicine",
+      dose: item.dose,
+      route: item.route,
+      frequency: item.frequency,
+      duration: item.duration,
+      prescribed,
+      dispensed,
+      remaining,
+      status:
+        remaining <= 0 ? "dispensed" : dispensed > 0 ? "partial" : "pending",
+    });
+    itemsByPrescription.set(item.prescription_id, lines);
+  }
+
+  return visible.map((prescription) => {
+    const encounter = encounterById.get(prescription.encounter_id);
+    const patient = encounter ? patients.get(encounter.patient_id) : undefined;
+    return {
+      id: prescription.id,
+      patient: patient?.name ?? "Patient",
+      patientNumber: patient?.number ?? null,
+      prescribedAt: prescription.created_at,
+      status: prescription.status,
+      prescriberName: ctx.fullName,
+      prescriberDepartment: ctx.departmentName,
+      prescriberSpecialization: ctx.specialization,
+      prescriberCode: ctx.employeeCode,
+      items: itemsByPrescription.get(prescription.id) ?? [],
+    };
+  });
 }
 
 /** Records a pharmacy hand-off and updates the prescription line's status. */
@@ -2824,6 +3242,7 @@ export type DoctorData = {
   openEncounters: number;
   resultsToReview: number;
   draftNotes: number;
+  labAssignments: number;
   schedule: {
     id: string;
     time: string;
@@ -2836,6 +3255,7 @@ export type DoctorData = {
   }[];
   patients: {
     id: string;
+    patientId: string;
     name: string;
     number: string | null;
     detail: string;
@@ -2858,54 +3278,70 @@ export async function loadDoctorData(ctx: StaffContext): Promise<DoctorData> {
   const today = dayBounds();
   const employeeId = ctx.employeeId;
 
-  const [appointmentsToday, openEncounters, resultsToReview, draftNotes] =
-    await Promise.all([
-      employeeId
-        ? counted(
-            "your appointments",
-            supabase
-              .from("appointments")
-              .select("id", { count: "exact", head: true })
-              .eq("tenant_id", ctx.tenantId ?? "")
-              .eq("facility_id", ctx.facilityId ?? "")
-              .eq("provider_id", employeeId)
-              .gte("scheduled_at", today.start)
-              .lt("scheduled_at", today.end)
-              .in("status", ["scheduled", "checked_in"]),
-          )
-        : 0,
-      employeeId
-        ? counted(
-            "your open encounters",
-            supabase
-              .from("encounters")
-              .select("id", { count: "exact", head: true })
-              .eq("tenant_id", ctx.tenantId ?? "")
-              .eq("facility_id", ctx.facilityId ?? "")
-              .eq("provider_id", employeeId)
-              .eq("status", "open"),
-          )
-        : 0,
-      counted(
-        "lab results",
-        supabase
-          .from("lab_results")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", ctx.tenantId ?? "")
-          .eq("status", "preliminary"),
-      ),
-      employeeId
-        ? counted(
-            "your draft notes",
-            supabase
-              .from("clinical_notes")
-              .select("id", { count: "exact", head: true })
-              .eq("tenant_id", ctx.tenantId ?? "")
-              .eq("author_id", employeeId)
-              .eq("status", "draft"),
-          )
-        : 0,
-    ]);
+  const [
+    appointmentsToday,
+    openEncounters,
+    resultsToReview,
+    draftNotes,
+    labAssignments,
+  ] = await Promise.all([
+    employeeId
+      ? counted(
+          "your appointments",
+          supabase
+            .from("appointments")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", ctx.tenantId ?? "")
+            .eq("facility_id", ctx.facilityId ?? "")
+            .eq("provider_id", employeeId)
+            .gte("scheduled_at", today.start)
+            .lt("scheduled_at", today.end)
+            .in("status", ["scheduled", "checked_in"]),
+        )
+      : 0,
+    employeeId
+      ? counted(
+          "your open encounters",
+          supabase
+            .from("encounters")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", ctx.tenantId ?? "")
+            .eq("facility_id", ctx.facilityId ?? "")
+            .eq("provider_id", employeeId)
+            .in("status", ["open", "checked"]),
+        )
+      : 0,
+    counted(
+      "lab results",
+      supabase
+        .from("lab_results")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", ctx.tenantId ?? "")
+        .eq("status", "preliminary"),
+    ),
+    employeeId
+      ? counted(
+          "your draft notes",
+          supabase
+            .from("clinical_notes")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", ctx.tenantId ?? "")
+            .eq("author_id", employeeId)
+            .eq("status", "draft"),
+        )
+      : 0,
+    employeeId
+      ? counted(
+          "your lab assignments",
+          supabase
+            .from("lab_orders")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", ctx.tenantId ?? "")
+            .eq("ordered_by", employeeId)
+            .in("status", ["placed", "in_progress"]),
+        )
+      : 0,
+  ]);
 
   const [appointmentRes, encounterRes, noteRes, notificationRes, critical] =
     await Promise.all([
@@ -2991,11 +3427,27 @@ export async function loadDoctorData(ctx: StaffContext): Promise<DoctorData> {
     ctx.tenantId,
   );
 
+  // The encounter query is newest first, so the first row seen for a patient
+  // is their latest encounter. Keep one row per patient for the dropdown list.
+  const recentPatients = new Map<string, DoctorData["patients"][number]>();
+  for (const row of encounters) {
+    if (recentPatients.has(row.patient_id)) continue;
+    recentPatients.set(row.patient_id, {
+      id: row.id,
+      patientId: row.patient_id,
+      name: patients.get(row.patient_id)?.name ?? "Patient",
+      number: patients.get(row.patient_id)?.number ?? null,
+      detail: humanise(row.encounter_type),
+      status: row.status,
+    });
+  }
+
   return {
     appointmentsToday,
     openEncounters,
     resultsToReview,
     draftNotes,
+    labAssignments,
     schedule: appointments.map((row) => ({
       id: row.id,
       time: formatTime(row.scheduled_at),
@@ -3006,13 +3458,7 @@ export async function loadDoctorData(ctx: StaffContext): Promise<DoctorData> {
       reason: row.reason,
       location: row.location,
     })),
-    patients: encounters.map((row) => ({
-      id: row.id,
-      name: patients.get(row.patient_id)?.name ?? "Patient",
-      number: patients.get(row.patient_id)?.number ?? null,
-      detail: humanise(row.encounter_type),
-      status: row.status,
-    })),
+    patients: [...recentPatients.values()],
     critical,
     notes: notes.map((row) => {
       const enc = noteEncounters.find((e) => e.id === row.encounter_id);
@@ -3045,6 +3491,30 @@ export async function loadDoctorData(ctx: StaffContext): Promise<DoctorData> {
       };
     }),
   };
+}
+
+export type DoctorEncounterStatus = "open" | "checked" | "closed";
+
+/**
+ * A doctor updates the status of an encounter they own. The security-definer
+ * RPC keeps the write to their own encounter in their tenant and facility.
+ */
+export async function updateMyPatientEncounterStatus(
+  encounterId: string,
+  status: DoctorEncounterStatus,
+): Promise<void> {
+  const { data, error } = await supabase.rpc("update_my_encounter_status", {
+    _encounter_id: encounterId,
+    _status: status,
+  });
+  if (error) {
+    throw new Error(`Could not update the patient status: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error(
+      "Could not update the patient status. Check your access and try again.",
+    );
+  }
 }
 
 async function loadCriticalResults(ctx: StaffContext, limit: number) {

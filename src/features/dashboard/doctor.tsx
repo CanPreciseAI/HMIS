@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   CalendarDays,
   CircleAlert,
@@ -5,19 +6,26 @@ import {
   FlaskConical,
   Loader2,
   Stethoscope,
-  Users,
 } from "lucide-react";
 import { greeting, loadDoctorData, type StaffContext } from "./data";
 import { DashboardShell, PageHeading } from "./shell";
 import { DOCTOR_NAV } from "./doctor-nav";
 import { useDashboardData } from "./use-dashboard-data";
 import { EmptyState, Panel, StatCard, StatusPill } from "./ui";
-import { MedicineCatalogReference } from "./medicine-catalog";
 import { MedicineRequestsPanel } from "./medicine-requests";
-import { PatientHistoryPanel } from "./patient-history";
+import { YourPatientsPanel } from "./patient-history";
+import { DoctorScheduleCalendar } from "./doctor-schedule-calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function DoctorDashboard({ ctx }: { ctx: StaffContext }) {
   const { data, loading, error } = useDashboardData(ctx, loadDoctorData);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   return (
     <DashboardShell
@@ -35,7 +43,29 @@ export function DoctorDashboard({ ctx }: { ctx: StaffContext }) {
             : "Your clinical day at a glance."
         }
         meta={data ? `${data.appointmentsToday} booked today` : undefined}
+        action={
+          <button
+            type="button"
+            onClick={() => setCalendarOpen(true)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <CalendarDays className="size-4" aria-hidden="true" />
+            Calendar
+          </button>
+        }
       />
+
+      <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="pr-8">
+            <DialogTitle>Your calendar</DialogTitle>
+            <DialogDescription>
+              Browse your month and select a day to see booked appointments.
+            </DialogDescription>
+          </DialogHeader>
+          <DoctorScheduleCalendar ctx={ctx} />
+        </DialogContent>
+      </Dialog>
 
       {loading && <LoadingBlock />}
       {error && <ErrorBlock message={error} />}
@@ -58,9 +88,9 @@ export function DoctorDashboard({ ctx }: { ctx: StaffContext }) {
             />
             <StatCard
               icon={FlaskConical}
-              label="Results to review"
-              value={data.resultsToReview}
-              hint="Preliminary lab results"
+              label="Lab assignments"
+              value={data.labAssignments}
+              hint="Tests waiting in the lab"
               tone="amber"
             />
             <StatCard
@@ -76,74 +106,17 @@ export function DoctorDashboard({ ctx }: { ctx: StaffContext }) {
             <div className="space-y-5">
               <Panel
                 id="schedule"
-                title="Today's schedule"
-                subtitle="Appointments assigned to you"
+                title="Your schedule"
+                subtitle="See how busy your month is, then select a day to review its appointments."
               >
-                {data.schedule.length === 0 ? (
-                  <EmptyState
-                    icon={CalendarDays}
-                    title="No appointments booked"
-                    description="Appointments assigned to you for today will appear here as they are scheduled."
-                  />
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {data.schedule.map((row) => (
-                      <li
-                        key={row.id}
-                        className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="grid h-9 w-14 shrink-0 place-items-center rounded-lg bg-muted text-xs font-semibold text-foreground">
-                            {row.time}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-foreground">
-                              {row.patient}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {row.appointmentType} · {row.number ?? "No MRN"}
-                            </p>
-                          </div>
-                        </div>
-                        <StatusPill status={row.status} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <DoctorScheduleCalendar ctx={ctx} />
               </Panel>
 
-              <Panel
-                id="patients"
-                title="Your patients"
-                subtitle="Most recent encounters you are responsible for"
-              >
-                {data.patients.length === 0 ? (
-                  <EmptyState
-                    icon={Users}
-                    title="No encounters yet"
-                    description="Patients you open an encounter for will be listed here."
-                  />
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {data.patients.map((row) => (
-                      <li
-                        key={row.id}
-                        className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-foreground">
-                            {row.name}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {row.number ?? "No MRN"} · {row.detail}
-                          </p>
-                        </div>
-                        <StatusPill status={row.status} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Panel>
+              <YourPatientsPanel
+                ctx={ctx}
+                patients={data.patients}
+                openEncounters={data.openEncounters}
+              />
             </div>
 
             <div className="space-y-5">
@@ -221,12 +194,6 @@ export function DoctorDashboard({ ctx }: { ctx: StaffContext }) {
                 )}
               </Panel>
             </div>
-          </div>
-          <div className="mt-5">
-            <PatientHistoryPanel ctx={ctx} />
-          </div>
-          <div className="mt-5">
-            <MedicineCatalogReference tenantId={ctx.tenantId} />
           </div>
           <div className="mt-5">
             <MedicineRequestsPanel ctx={ctx} />

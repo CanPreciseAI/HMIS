@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
-import { History, Loader2 } from "lucide-react";
+import { ChevronDown, History, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   formatDate,
   loadPatientClinicalHistory,
-  loadPatientHistoryOptions,
+  updateMyPatientEncounterStatus,
+  type DoctorEncounterStatus,
   type PatientClinicalHistory,
-  type PatientHistoryOption,
   type StaffContext,
 } from "./data";
 import { EmptyState, Panel, StatusPill } from "./ui";
 
-const fieldClass =
-  "mt-1 h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60";
+export type YourPatientRow = {
+  id: string;
+  patientId: string;
+  name: string;
+  number: string | null;
+  detail: string;
+  status: string;
+};
 
 function ageLabel(dateOfBirth: string | null) {
   if (!dateOfBirth) return null;
@@ -40,60 +47,171 @@ function SectionHeading({ title, count }: { title: string; count?: number }) {
 }
 
 /**
- * A patient's clinical past in one place: every medicine they were prescribed,
- * the visits and admissions they went through, their diagnoses and results.
- * The doctor picks any active patient in the hospital and reads the record
- * before writing a new prescription.
+ * The doctor's patient list. Each patient is a dropdown that loads their
+ * clinical past only when opened: medicines, visits, diagnoses and results.
  */
-export function PatientHistoryPanel({ ctx }: { ctx: StaffContext }) {
-  const [patients, setPatients] = useState<PatientHistoryOption[]>([]);
-  const [patientId, setPatientId] = useState("");
+export function YourPatientsPanel({
+  ctx,
+  patients,
+  openEncounters,
+}: {
+  ctx: StaffContext;
+  patients: YourPatientRow[];
+  openEncounters: number;
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [rows, setRows] = useState(patients);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const openLabel = `${openEncounters} open encounter${openEncounters === 1 ? "" : "s"}`;
+
+  useEffect(() => {
+    setRows(patients);
+  }, [patients]);
+
+  async function updateStatus(
+    row: YourPatientRow,
+    status: DoctorEncounterStatus,
+  ) {
+    if (status === row.status) return;
+    setSavingId(row.id);
+    try {
+      await updateMyPatientEncounterStatus(row.id, status);
+      setRows((current) =>
+        current.map((item) =>
+          item.id === row.id ? { ...item, status } : item,
+        ),
+      );
+      toast.success(`${row.name}'s visit marked ${status}`);
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error
+          ? cause.message
+          : "Could not update the patient status.",
+      );
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  return (
+    <Panel
+      id="patients"
+      title="Your patients"
+      subtitle={`Open a patient to review their history, or update the status of their current visit. Marking it Checked adds the ₹500 consultation fee to the billing ledger${
+        openEncounters ? ` · ${openLabel}` : ""
+      }.`}
+      action={
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
+          <History className="size-4" aria-hidden="true" />
+        </span>
+      }
+    >
+      {patients.length === 0 ? (
+        <EmptyState
+          icon={History}
+          title="No encounters yet"
+          description="Patients you open an encounter for will be listed here."
+        />
+      ) : (
+        <ul className="divide-y divide-border">
+          {rows.map((row) => {
+            const expanded = expandedId === row.patientId;
+            const panelId = `patient-history-${row.patientId}`;
+            return (
+              <li key={row.patientId}>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    aria-controls={panelId}
+                    onClick={() =>
+                      setExpandedId((current) =>
+                        current === row.patientId ? null : row.patientId,
+                      )
+                    }
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg py-3 text-left transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {row.name}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {row.number ?? "No MRN"} · {row.detail}
+                      </p>
+                    </div>
+                    <ChevronDown
+                      className={`size-4 shrink-0 text-muted-foreground transition-transform ${
+                        expanded ? "rotate-180" : ""
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <label className="flex shrink-0 items-center gap-1.5">
+                    <span className="sr-only">Visit status for {row.name}</span>
+                    {savingId === row.id && (
+                      <Loader2
+                        className="size-3.5 animate-spin text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <select
+                      value={row.status}
+                      onChange={(event) =>
+                        void updateStatus(
+                          row,
+                          event.currentTarget.value as DoctorEncounterStatus,
+                        )
+                      }
+                      disabled={savingId !== null}
+                      aria-label={`Visit status for ${row.name}`}
+                      title="Update visit status"
+                      className="h-8 rounded-lg border border-input bg-background px-2 text-xs font-medium text-foreground transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
+                    >
+                      <option value="open">Open</option>
+                      <option value="checked">Checked</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </label>
+                </div>
+                {expanded && (
+                  <div id={panelId} className="pb-4">
+                    <PatientHistoryDetails
+                      ctx={ctx}
+                      patientId={row.patientId}
+                    />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+export function PatientHistoryDetails({
+  ctx,
+  patientId,
+}: {
+  ctx: StaffContext;
+  patientId: string;
+}) {
   const [history, setHistory] = useState<PatientClinicalHistory | null>(null);
-  const [loadingPatients, setLoadingPatients] = useState(true);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingPatients(true);
-    void loadPatientHistoryOptions(ctx)
-      .then((rows) => {
-        if (cancelled) return;
-        setPatients(rows);
-        setPatientId((current) => current || rows[0]?.id || "");
-      })
-      .catch((cause: unknown) => {
-        if (cancelled) return;
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Could not load the patient list.",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingPatients(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [ctx]);
-
-  useEffect(() => {
-    if (!patientId) {
-      setHistory(null);
-      return;
-    }
-    let cancelled = false;
-    setLoadingHistory(true);
+    setLoading(true);
     setError("");
+    setHistory(null);
     void loadPatientClinicalHistory(ctx, patientId)
       .then((result) => {
-        if (cancelled) return;
-        setHistory(result);
+        if (!cancelled) setHistory(result);
       })
       .catch((cause: unknown) => {
         if (cancelled) return;
-        setHistory(null);
         setError(
           cause instanceof Error
             ? cause.message
@@ -101,7 +219,7 @@ export function PatientHistoryPanel({ ctx }: { ctx: StaffContext }) {
         );
       })
       .finally(() => {
-        if (!cancelled) setLoadingHistory(false);
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -111,64 +229,36 @@ export function PatientHistoryPanel({ ctx }: { ctx: StaffContext }) {
   const age = history ? ageLabel(history.patient.dateOfBirth) : null;
 
   return (
-    <Panel
-      title="Patient history"
-      subtitle="Pick a patient to read their medication history and everything they have been through at this hospital."
-      action={
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
-          <History className="size-4" aria-hidden="true" />
-        </span>
-      }
-    >
-      <div className="grid gap-3 sm:max-w-md">
-        <label className="text-xs font-medium text-foreground">
-          Patient
-          <select
-            value={patientId}
-            onChange={(event) => setPatientId(event.currentTarget.value)}
-            disabled={loadingPatients || patients.length === 0}
-            className={fieldClass}
-          >
-            {patients.length === 0 && (
-              <option value="">
-                {loadingPatients ? "Loading patients…" : "No active patients"}
-              </option>
-            )}
-            {patients.map((patient) => (
-              <option key={patient.id} value={patient.id}>
-                {patient.name} · {patient.number}
-              </option>
-            ))}
-          </select>
-        </label>
+    <div className="rounded-xl border border-border bg-muted/20 p-3 sm:p-4">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <History className="size-4 text-primary" aria-hidden="true" />
+        Clinical history
       </div>
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}
 
-      {loadingHistory && (
-        <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+      {loading && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           Loading the patient's record…
         </p>
       )}
 
-      {!loadingHistory && !history && !error && (
-        <div className="mt-4">
-          <EmptyState
-            icon={History}
-            title="No patient selected"
-            description="Choose a patient to see their medication history, visits, diagnoses and results."
-          />
-        </div>
+      {!loading && !history && !error && (
+        <EmptyState
+          icon={History}
+          title="No history available"
+          description="This patient does not have any clinical records yet."
+        />
       )}
 
       {history && (
         <>
-          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
             <span className="text-sm font-semibold text-foreground">
               {history.patient.name}
             </span>
@@ -202,7 +292,7 @@ export function PatientHistoryPanel({ ctx }: { ctx: StaffContext }) {
                   No medicines have been prescribed to this patient yet.
                 </p>
               ) : (
-                <ul className="divide-y divide-border rounded-xl border border-border">
+                <ul className="divide-y divide-border rounded-xl border border-border bg-card">
                   {history.medications.map((row) => (
                     <li key={row.id} className="px-3 py-2.5">
                       <div className="flex items-start justify-between gap-2">
@@ -239,7 +329,7 @@ export function PatientHistoryPanel({ ctx }: { ctx: StaffContext }) {
                   No visits, admissions or appointments recorded yet.
                 </p>
               ) : (
-                <ul className="divide-y divide-border rounded-xl border border-border">
+                <ul className="divide-y divide-border rounded-xl border border-border bg-card">
                   {history.events.map((row) => (
                     <li
                       key={row.id}
@@ -271,7 +361,7 @@ export function PatientHistoryPanel({ ctx }: { ctx: StaffContext }) {
                   No diagnoses recorded for this patient.
                 </p>
               ) : (
-                <ul className="divide-y divide-border rounded-xl border border-border">
+                <ul className="divide-y divide-border rounded-xl border border-border bg-card">
                   {history.diagnoses.map((row) => (
                     <li key={row.id} className="px-3 py-2.5">
                       <p className="text-sm font-medium text-foreground">
@@ -297,7 +387,7 @@ export function PatientHistoryPanel({ ctx }: { ctx: StaffContext }) {
                   No laboratory results recorded for this patient.
                 </p>
               ) : (
-                <ul className="divide-y divide-border rounded-xl border border-border">
+                <ul className="divide-y divide-border rounded-xl border border-border bg-card">
                   {history.labs.map((row) => (
                     <li
                       key={row.id}
@@ -324,6 +414,6 @@ export function PatientHistoryPanel({ ctx }: { ctx: StaffContext }) {
           </div>
         </>
       )}
-    </Panel>
+    </div>
   );
 }

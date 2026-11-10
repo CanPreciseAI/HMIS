@@ -95,6 +95,7 @@ const STATUS_TONES: Record<string, string> = {
   ordered: "bg-sky-50 text-sky-700 ring-sky-200",
   preliminary: "bg-amber-50 text-amber-700 ring-amber-200",
   checked_in: "bg-amber-50 text-amber-700 ring-amber-200",
+  checked: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   in_progress: "bg-amber-50 text-amber-700 ring-amber-200",
   urgent: "bg-rose-50 text-rose-700 ring-rose-200",
   draft: "bg-muted text-muted-foreground ring-border",

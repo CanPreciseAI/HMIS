@@ -1,9 +1,11 @@
 import {
   BedDouble,
   CalendarDays,
+  ClipboardList,
   FileText,
   FlaskConical,
   NotebookPen,
+  Receipt,
   Users,
 } from "lucide-react";
 import type { NavItem } from "./shell";
@@ -22,8 +24,8 @@ export const DOCTOR_NAV: NavItem[] = [
   },
   { label: "Your patients", href: "/dashboard/your-patients", icon: Users },
   {
-    label: "Results to review",
-    href: "/dashboard/results-to-review",
+    label: "Lab assignments",
+    href: "/dashboard/lab-assignments",
     icon: FlaskConical,
   },
   { label: "Recent notes", href: "/dashboard/recent-notes", icon: FileText },
@@ -32,4 +34,10 @@ export const DOCTOR_NAV: NavItem[] = [
     href: "/dashboard/write-prescription",
     icon: NotebookPen,
   },
+  {
+    label: "Prescription history",
+    href: "/dashboard/prescription-history",
+    icon: ClipboardList,
+  },
+  { label: "Billing", href: "/dashboard/service-charges", icon: Receipt },
 ];

@@ -1845,6 +1845,8 @@ export type Database = {
 
       lab_orders: {
         Row: {
+          assigned_at: string | null;
+          assigned_to: string | null;
           created_at: string;
           encounter_id: string;
           id: string;
@@ -1856,6 +1858,8 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          assigned_at?: string | null;
+          assigned_to?: string | null;
           created_at?: string;
           encounter_id: string;
           id?: string;
@@ -1867,6 +1871,8 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          assigned_at?: string | null;
+          assigned_to?: string | null;
           created_at?: string;
           encounter_id?: string;
           id?: string;
@@ -2615,6 +2621,7 @@ export type Database = {
           amount: number;
           charge_id: string;
           created_at: string;
+          encounter_id: string | null;
           facility_id: string;
           id: string;
           invoice_id: string | null;
@@ -2636,6 +2643,7 @@ export type Database = {
           amount: number;
           charge_id: string;
           created_at?: string;
+          encounter_id?: string | null;
           facility_id: string;
           id?: string;
           invoice_id?: string | null;
@@ -2657,6 +2665,7 @@ export type Database = {
           amount?: number;
           charge_id?: string;
           created_at?: string;
+          encounter_id?: string | null;
           facility_id?: string;
           id?: string;
           invoice_id?: string | null;
@@ -4598,6 +4607,23 @@ export type Database = {
           admission_status: string;
         }[];
       };
+      facility_lab_technicians: {
+        Args: { _facility_id: string };
+        Returns: { employee_id: string; full_name: string }[];
+      };
+      create_lab_assignment: {
+        Args: {
+          _patient_id: string;
+          _test_ids: string[];
+          _assigned_to: string;
+          _priority?: string;
+        };
+        Returns: { lab_order_id: string; item_count: number }[];
+      };
+      update_my_encounter_status: {
+        Args: { _encounter_id: string; _status: string };
+        Returns: string;
+      };
       admit_patient_to_ward: {
         Args: {
           _patient_id: string;
@@ -4666,7 +4692,11 @@ export type Database = {
           patient_id: string;
           patient_name: string;
           patient_number: string | null;
+          prescriber_id: string | null;
           prescriber_name: string;
+          prescriber_department: string | null;
+          prescriber_specialization: string | null;
+          prescriber_code: string | null;
           medicine_id: string;
           medicine_name: string;
           dose: string;

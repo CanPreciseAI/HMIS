@@ -10,7 +10,7 @@ import {
 } from "./data";
 import { EmptyState, Panel, StatusPill } from "./ui";
 
-const ENCOUNTER_STATUSES = ["open", "closed"];
+const ENCOUNTER_STATUSES = ["open", "checked", "closed"];
 const ADMISSION_STATUSES = ["active", "discharged"];
 
 const selectClass =

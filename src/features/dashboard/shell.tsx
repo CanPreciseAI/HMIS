@@ -312,10 +312,12 @@ export function PageHeading({
   title,
   subtitle,
   meta,
+  action,
 }: {
   title: string;
   subtitle: string;
   meta?: string | undefined;
+  action?: ReactNode;
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
@@ -325,10 +327,15 @@ export function PageHeading({
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
       </div>
-      {meta && (
-        <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
-          {meta}
-        </span>
+      {(meta || action) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {meta && (
+            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
+              {meta}
+            </span>
+          )}
+          {action}
+        </div>
       )}
     </div>
   );
