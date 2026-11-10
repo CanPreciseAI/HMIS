@@ -32,8 +32,9 @@ export default defineConfig(({ command, mode }) => {
       }),
       ...(command === "build"
         ? [
+            const nitroPreset = process.env.VERCEL ? "vercel" : "cloudflare-module";
             nitro({
-              preset: "cloudflare-module",
+              preset: nitroPreset,
               output: {
                 dir: outputDir,
                 serverDir: `${outputDir}/server`,
