@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/auth-hero.jpg";
-import logo from "@/assets/canprecise-logo.png";
+import logo from "@/assets/canprecise-logo-DKiSxahp.png";
 
 export const Route = createFileRoute("/patient-auth")({
   validateSearch: z.object({

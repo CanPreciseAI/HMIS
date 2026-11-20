@@ -112,7 +112,10 @@ import { PrescriptionWriterPanel } from "@/features/dashboard/prescription-write
 import { PrescriptionHistoryPanel } from "@/features/dashboard/prescription-history";
 import { YourPatientsPanel } from "@/features/dashboard/patient-history";
 import { LabAssignmentsPanel } from "@/features/dashboard/lab-assignments";
-import { buildSectionNotifications } from "@/features/dashboard/section-notifications";
+import {
+  buildOverviewNotifications,
+  buildSectionNotifications,
+} from "@/features/dashboard/section-notifications";
 import { HandoffNotePanel } from "@/features/dashboard/handoff-note";
 import {
   HospitalAdminRequestList,
@@ -950,7 +953,7 @@ function DashboardSectionPage() {
     }
     setExtraNotifications(null);
     return () => {
-      // Other roles do not show a notification bell.
+      // Other roles build their bell notifications from the loaded page data.
     };
   }, [ctx, data]);
 
@@ -1001,12 +1004,14 @@ function DashboardSectionPage() {
     ctx.role === "doctor"
       ? (extraNotifications ??
         (data && "notifications" in data ? data.notifications : []))
-      : [];
+      : data
+        ? buildOverviewNotifications(ctx.role, data)
+        : [];
   const sectionNotifications =
     section && data ? buildSectionNotifications(rawSection, data) : [];
   const notificationItems = [
-    ...sectionNotifications,
     ...notificationsForBell,
+    ...sectionNotifications,
   ].filter(
     (item, index, all) =>
       all.findIndex((candidate) => candidate.id === item.id) === index,
@@ -1169,6 +1174,7 @@ function SectionContent({
               ctx.role === "nurse" ||
               ctx.role === "doctor"
             }
+            canAdmit={ctx.role === "hospital_admin" || ctx.role === "nurse"}
           />
         )}
       </div>

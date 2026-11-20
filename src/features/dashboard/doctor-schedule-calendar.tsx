@@ -37,9 +37,9 @@ function dayLabel(date: string) {
 }
 
 /**
- * Month view of the doctor's own clinic, with the selected day's visits below
- * it. Appointment entries carry their status colour so busy days are visible
- * at a glance.
+ * Full month view of the doctor's own clinic, with the selected day's visits
+ * alongside it. Appointment entries carry their status colour so busy days
+ * are visible at a glance.
  */
 export function DoctorScheduleCalendar({ ctx }: { ctx: StaffContext }) {
   const today = calendarDateKey(new Date());
@@ -105,7 +105,7 @@ export function DoctorScheduleCalendar({ ctx }: { ctx: StaffContext }) {
           <p className="mt-2 text-xs">Loading your schedule…</p>
         </div>
       ) : (
-        <>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
           <AppointmentCalendar
             month={month}
             onMonthChange={(next) => {
@@ -119,7 +119,7 @@ export function DoctorScheduleCalendar({ ctx }: { ctx: StaffContext }) {
             entries={entries}
           />
 
-          <div className="mt-4 rounded-xl border border-border bg-muted/20 p-3">
+          <div className="rounded-xl border border-border bg-muted/20 p-3 xl:self-start">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {dayLabel(selectedDate)}
@@ -165,7 +165,7 @@ export function DoctorScheduleCalendar({ ctx }: { ctx: StaffContext }) {
               </ul>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -439,6 +439,19 @@ function PatientPortal() {
                                 : "Issued date unavailable"}{" "}
                               · {row.status}
                             </p>
+                            {data.invoiceItems.some(
+                              (item) => item.invoiceId === row.id,
+                            ) && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {data.invoiceItems
+                                  .filter((item) => item.invoiceId === row.id)
+                                  .map(
+                                    (item) =>
+                                      `${item.description} × ${item.quantity}`,
+                                  )
+                                  .join(" · ")}
+                              </p>
+                            )}
                           </div>
                           <div className="flex shrink-0 items-center gap-3">
                             <span className="text-sm font-semibold text-foreground">

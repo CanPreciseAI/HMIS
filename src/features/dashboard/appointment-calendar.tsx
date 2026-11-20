@@ -41,6 +41,16 @@ const TONE_CLASS: Record<CalendarEntryTone, string> = {
   completed: "bg-muted text-muted-foreground",
 };
 
+const TONE_DOT_CLASS: Record<CalendarEntryTone, string> = {
+  booked: "bg-slate-400",
+  pending: "bg-amber-500",
+  confirmed: "bg-emerald-500",
+  unavailable: "bg-rose-500",
+  surgery: "bg-violet-500",
+  procedure: "bg-sky-500",
+  completed: "bg-muted-foreground/50",
+};
+
 const LEGEND: { tone: CalendarEntryTone; label: string }[] = [
   { tone: "booked", label: "Booked" },
   { tone: "pending", label: "Awaiting reply" },
@@ -92,8 +102,8 @@ function initials(name: string) {
 }
 
 /**
- * A compact month calendar shared by reception and doctors. Entries remain
- * inline, and selecting a day lets the surrounding screen show that day's
+ * A month calendar shared by reception and doctors. Entries remain inline,
+ * and selecting a day lets the surrounding screen show that day's
  * availability, appointments and free slots.
  */
 export function AppointmentCalendar({
@@ -138,7 +148,7 @@ export function AppointmentCalendar({
           >
             <ChevronLeft className="size-4" />
           </button>
-          <p className="min-w-36 text-center font-display text-sm font-semibold text-foreground">
+          <p className="min-w-40 text-center font-display text-base font-semibold text-foreground">
             {monthLabel(month)}
           </p>
           <button
@@ -166,13 +176,17 @@ export function AppointmentCalendar({
         </p>
       </div>
 
-      <div className="mt-3 overflow-x-auto pb-1">
-        <div className="min-w-[700px]">
+      <div className="mt-4 overflow-x-auto pb-1">
+        <div className="min-w-[640px]">
           <div className="grid grid-cols-7 gap-1">
-            {WEEKDAYS.map((weekday) => (
+            {WEEKDAYS.map((weekday, index) => (
               <p
                 key={weekday}
-                className="py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                className={`py-1 text-center text-[10px] font-semibold uppercase tracking-wide ${
+                  index > 4
+                    ? "text-muted-foreground/60"
+                    : "text-muted-foreground"
+                }`}
               >
                 {weekday}
               </p>
@@ -198,15 +212,15 @@ export function AppointmentCalendar({
                   onClick={() => onSelectDate(date)}
                   aria-pressed={selected}
                   aria-label={`${date}, ${dayEntries.length} appointment${dayEntries.length === 1 ? "" : "s"}`}
-                  className={`min-h-24 rounded-lg border p-1.5 text-left align-top transition ${
+                  className={`min-h-28 rounded-xl border p-2 text-left align-top transition ${
                     selected
-                      ? "border-primary bg-secondary/50 ring-1 ring-primary"
-                      : "border-border hover:bg-accent/50"
+                      ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary"
+                      : "border-border hover:border-primary/40 hover:bg-accent/50"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1">
                     <span
-                      className={`grid size-6 place-items-center rounded-full text-xs font-semibold ${
+                      className={`grid size-7 place-items-center rounded-full text-xs font-semibold ${
                         date === today
                           ? "bg-primary text-primary-foreground"
                           : "text-foreground"
@@ -220,19 +234,19 @@ export function AppointmentCalendar({
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 space-y-0.5">
-                    {dayEntries.slice(0, 2).map((entry) => (
+                  <div className="mt-1.5 space-y-1">
+                    {dayEntries.slice(0, 3).map((entry) => (
                       <span
                         key={entry.id}
                         title={`${formatTime(entry.at)} · ${entry.title} · ${entry.detail}`}
-                        className={`block truncate rounded px-1 py-0.5 text-[10px] font-medium ${TONE_CLASS[entry.tone]}`}
+                        className={`block truncate rounded-md px-1.5 py-0.5 text-[10px] font-medium ${TONE_CLASS[entry.tone]}`}
                       >
                         {formatTime(entry.at)} {entry.title}
                       </span>
                     ))}
-                    {dayEntries.length > 2 && (
+                    {dayEntries.length > 3 && (
                       <span className="block px-1 text-[10px] text-muted-foreground">
-                        +{dayEntries.length - 2} more
+                        +{dayEntries.length - 3} more
                       </span>
                     )}
                   </div>
@@ -292,7 +306,7 @@ export function AppointmentCalendar({
       <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         {LEGEND.map(({ tone, label }) => (
           <span key={tone} className="inline-flex items-center gap-1.5">
-            <span className={`size-2 rounded-full ${TONE_CLASS[tone]}`} />
+            <span className={`size-2 rounded-full ${TONE_DOT_CLASS[tone]}`} />
             {label}
           </span>
         ))}

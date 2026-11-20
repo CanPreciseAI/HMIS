@@ -160,3 +160,564 @@
 @page {
   margin: 14mm;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Cinematic hero page                                                        */
+/* -------------------------------------------------------------------------- */
+
+.cp-hero {
+  background:
+    radial-gradient(
+      120% 90% at 78% 4%,
+      rgba(25, 72, 120, 0.5),
+      transparent 56%
+    ),
+    radial-gradient(
+      80% 70% at 12% 18%,
+      rgba(10, 64, 86, 0.38),
+      transparent 62%
+    ),
+    #030814;
+  isolation: isolate;
+}
+
+.cp-hero-glow-a {
+  top: -30vw;
+  right: -20vw;
+  width: 70vw;
+  height: 70vw;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.2), transparent 66%);
+  filter: blur(50px);
+}
+
+.cp-hero-glow-b {
+  bottom: -28vw;
+  left: -18vw;
+  width: 58vw;
+  height: 58vw;
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.18),
+    transparent 66%
+  );
+  filter: blur(60px);
+}
+
+.cp-hero-grain {
+  inset: 0;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  mix-blend-mode: screen;
+}
+
+.cp-hero-dna {
+  top: -16%;
+  right: max(-9rem, -12vw);
+  width: min(34rem, 48vw);
+  height: 132%;
+  opacity: 0.55;
+  -webkit-mask-image: radial-gradient(
+    58% 46% at 52% 44%,
+    black 0%,
+    rgba(0, 0, 0, 0.55) 58%,
+    transparent 82%
+  );
+  mask-image: radial-gradient(
+    58% 46% at 52% 44%,
+    black 0%,
+    rgba(0, 0, 0, 0.55) 58%,
+    transparent 82%
+  );
+}
+
+.cp-hero-dna svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cp-dna-flow {
+  animation: cp-dna-flow 30s linear infinite;
+}
+
+@property --cp-glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Aceternity-style glowing border that reacts to the pointer. */
+.cp-glow {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cp-glow-cursor,
+.cp-glow-beam {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.cp-glow-cursor {
+  background: radial-gradient(
+    var(--glow-size, 200px) circle at var(--glow-x, 50%) var(--glow-y, 0%),
+    rgba(103, 232, 249, 0.95),
+    rgba(129, 140, 248, 0.6) 38%,
+    transparent 68%
+  );
+  opacity: var(--glow-opacity, 0);
+  transition: opacity 0.28s ease;
+}
+
+.cp-glow-beam {
+  background: conic-gradient(
+    from var(--cp-glow-angle),
+    transparent 0deg,
+    rgba(103, 232, 249, 0.45) 45deg,
+    rgba(165, 180, 252, 0.35) 80deg,
+    transparent 150deg,
+    transparent 360deg
+  );
+  animation: cp-glow-spin 9s linear infinite;
+}
+
+@keyframes cp-glow-spin {
+  to {
+    --cp-glow-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-hero .cp-glow-beam {
+    animation: none !important;
+  }
+}
+
+/* Aceternity-style highlighter band behind a phrase. */
+.cp-highlight {
+  display: inline-block;
+  padding: 0.02em 0.12em 0.04em;
+  border-radius: 0.2em;
+  background-image: linear-gradient(
+    90deg,
+    rgba(34, 211, 238, 0.26),
+    rgba(165, 180, 252, 0.24)
+  );
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 0% 100%;
+  transition: background-size 1.35s cubic-bezier(0.4, 0, 0.2, 1) 0.15s;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.cp-highlight-on {
+  background-size: 100% 100%;
+}
+
+.cp-contact-dots {
+  background-image: radial-gradient(
+    rgba(186, 230, 253, 0.4) 1px,
+    transparent 1.2px
+  );
+  background-size: 18px 18px;
+  opacity: 0.14;
+  -webkit-mask-image: radial-gradient(
+    75% 65% at 72% 18%,
+    black 0%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(75% 65% at 72% 18%, black 0%, transparent 78%);
+}
+
+.cp-contact-map {
+  transform: perspective(900px) rotateX(38deg) rotateZ(-7deg) scale(1.06);
+  transform-origin: center 70%;
+}
+
+.cp-map-pin {
+  position: relative;
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(207, 250, 254, 0.95);
+  box-shadow: 0 0 10px rgba(103, 232, 249, 0.9);
+}
+
+.cp-map-pin-primary {
+  width: 9px;
+  height: 9px;
+  box-shadow: 0 0 18px rgba(103, 232, 249, 1);
+}
+
+.cp-map-pin-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  border: 1px solid rgba(165, 243, 252, 0.75);
+  animation: cp-map-ping 2.8s ease-out infinite;
+}
+
+.cp-map-scan {
+  animation: cp-map-scan 7s linear infinite;
+}
+
+@keyframes cp-map-ping {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes cp-map-pin-fade {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes cp-map-scan {
+  0% {
+    transform: translateX(-30%);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(420%);
+    opacity: 0;
+  }
+}
+
+.cp-stateful-pop {
+  animation: cp-stateful-pop 0.35s cubic-bezier(0.22, 1.4, 0.4, 1);
+}
+
+.cp-footer-wordmark {
+  animation: cp-footer-pulse 9s ease-in-out infinite;
+}
+
+.cp-dna-glow {
+  opacity: 0.14;
+  filter: blur(5px);
+}
+
+.cp-hero-halftone {
+  top: -12rem;
+  right: -10rem;
+  width: 54rem;
+  height: 54rem;
+  background-image: radial-gradient(
+    rgba(186, 230, 253, 0.5) 1px,
+    transparent 1.25px
+  );
+  background-size: 16px 16px;
+  opacity: 0.16;
+  -webkit-mask-image: radial-gradient(
+    circle at 52% 48%,
+    black 0%,
+    transparent 64%
+  );
+  mask-image: radial-gradient(circle at 52% 48%, black 0%, transparent 64%);
+  animation: cp-halftone-pulse 9s ease-in-out infinite;
+}
+
+.cp-hero-halftone-small {
+  right: -8rem;
+  bottom: -12rem;
+  width: 30rem;
+  height: 30rem;
+  background-image: radial-gradient(
+    rgba(186, 230, 253, 0.55) 1px,
+    transparent 1.3px
+  );
+  background-size: 14px 14px;
+  opacity: 0.12;
+  -webkit-mask-image: radial-gradient(circle, black 0%, transparent 68%);
+  mask-image: radial-gradient(circle, black 0%, transparent 68%);
+}
+
+.cp-hero-silk {
+  opacity: 0.8;
+}
+
+.cp-silk-line {
+  stroke-dasharray: 1100 1900;
+  stroke-dashoffset: 3000;
+  animation: cp-silk-draw 20s linear infinite;
+}
+
+.cp-silk-line-slow {
+  animation-duration: 29s;
+  animation-delay: -7s;
+}
+
+.cp-silk-line-fast {
+  animation-duration: 15s;
+  animation-delay: -3s;
+}
+
+.cp-serif {
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+.cp-pulse-dot {
+  box-shadow: 0 0 0 0 rgba(103, 232, 249, 0.55);
+  animation: cp-pulse 2.6s ease-out infinite;
+}
+
+.cp-hero-stage {
+  perspective: 1500px;
+}
+
+.cp-hero-halo {
+  inset: 6% 2% auto;
+  height: 76%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(34, 211, 238, 0.18),
+    transparent 66%
+  );
+  filter: blur(36px);
+}
+
+.cp-hero-dot-ring {
+  top: 1%;
+  right: 4%;
+  width: 26rem;
+  height: 26rem;
+  border-radius: 9999px;
+  background-image: radial-gradient(
+    rgba(103, 232, 249, 0.55) 1px,
+    transparent 1.4px
+  );
+  background-size: 12px 12px;
+  opacity: 0.35;
+  -webkit-mask-image: radial-gradient(
+    circle,
+    transparent 58%,
+    black 60%,
+    black 71%,
+    transparent 73%
+  );
+  mask-image: radial-gradient(
+    circle,
+    transparent 58%,
+    black 60%,
+    black 71%,
+    transparent 73%
+  );
+  animation: cp-spin 46s linear infinite;
+}
+
+.cp-hero-dashboard {
+  transform: perspective(1500px) rotateX(7deg) rotateY(-9deg) rotateZ(1.2deg);
+  transform-origin: center center;
+  animation: cp-float 9s ease-in-out infinite;
+}
+
+.cp-hero-chip {
+  animation: cp-chip-float 7s ease-in-out infinite;
+}
+
+.cp-hero-chip-b {
+  animation-delay: -3.5s;
+}
+
+.cp-hero-bar {
+  transform-origin: bottom;
+  animation: cp-bar 3.2s ease-in-out infinite alternate;
+}
+
+.cp-hero-bar:nth-child(2n) {
+  animation-delay: -1.4s;
+}
+
+.cp-marquee {
+  animation: cp-marquee 34s linear infinite;
+}
+
+@keyframes cp-float {
+  0%,
+  100% {
+    transform: perspective(1500px) rotateX(7deg) rotateY(-9deg) rotateZ(1.2deg)
+      translateY(0);
+  }
+  50% {
+    transform: perspective(1500px) rotateX(6deg) rotateY(-8deg) rotateZ(0.8deg)
+      translateY(-12px);
+  }
+}
+
+@keyframes cp-chip-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes cp-silk-draw {
+  0% {
+    stroke-dashoffset: 3000;
+  }
+  55%,
+  100% {
+    stroke-dashoffset: -3000;
+  }
+}
+
+@keyframes cp-halftone-pulse {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.22;
+  }
+}
+
+@keyframes cp-stateful-pop {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cp-footer-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes cp-dna-flow {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-880px);
+  }
+}
+
+@keyframes cp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cp-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(103, 232, 249, 0.55);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px rgba(103, 232, 249, 0);
+  }
+}
+
+@keyframes cp-bar {
+  from {
+    transform: scaleY(0.92);
+    opacity: 0.7;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cp-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 1023px) {
+  .cp-hero-dna {
+    top: -12%;
+    right: -22vw;
+    width: 72vw;
+    height: 118%;
+    opacity: 0.32;
+  }
+
+  .cp-hero-dashboard {
+    transform: none;
+    animation: none;
+  }
+
+  .cp-hero-dot-ring {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-hero *,
+  .cp-hero *::before,
+  .cp-hero *::after {
+    animation: none !important;
+  }
+
+  .cp-hero-dashboard {
+    transform: none;
+  }
+
+  .cp-dna-flow {
+    animation: none;
+  }
+
+  .cp-footer-wordmark {
+    animation: none;
+  }
+
+  .cp-map-scan {
+    display: none;
+  }
+
+  /* Keep a gentle, motion-free cue that the map is live. */
+  .cp-hero .cp-map-pin-ring {
+    animation: cp-map-pin-fade 3.2s ease-in-out infinite !important;
+  }
+}

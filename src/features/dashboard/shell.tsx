@@ -1,13 +1,18 @@
-﻿import { useState, type ReactNode } from "react";
+﻿import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import { Bell, LogOut, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import logo from "@/assets/canprecise-logo.png";
+import logo from "@/assets/canprecise-logo-DKiSxahp.png";
 import { ROLE_LABELS, type AdminNotification, type StaffContext } from "./data";
 import { Avatar } from "./ui";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export type NavItem = { label: string; href: string; icon: LucideIcon };
 
@@ -75,10 +80,19 @@ export function DashboardShell({
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [pathname]);
+
   const [availability, setAvailability] = useState(
     ctx.availability ?? "available",
   );
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   async function handleSignOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
@@ -107,6 +121,11 @@ export function DashboardShell({
     day: "numeric",
     month: "short",
   });
+  const notificationItems = notifications ?? [];
+  const notificationBadgeCount = Math.max(
+    notificationItems.length,
+    notificationCount ?? 0,
+  );
 
   return (
     <div className="min-h-screen bg-[oklch(0.975_0.01_185)]">
@@ -192,23 +211,102 @@ export function DashboardShell({
               </div>
 
               <div className="flex items-center gap-2">
-                {notificationHref !== undefined && (
-                  <DashboardLink
-                    href={notificationHref}
-                    aria-label={`${notificationCount ?? 0} pending staff approvals`}
-                    title="Pending staff approvals"
-                    className="relative grid size-8 place-items-center rounded-lg border border-input text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                <Popover
+                  open={notificationsOpen}
+                  onOpenChange={setNotificationsOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={
+                        notificationBadgeCount
+                          ? `Notifications (${notificationBadgeCount})`
+                          : "Notifications"
+                      }
+                      title="Notifications"
+                      className="relative grid size-8 place-items-center rounded-lg border border-input text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                    >
+                      <Bell className="size-4" />
+                      {notificationBadgeCount > 0 && (
+                        <span className="absolute -top-1 -right-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                          {notificationBadgeCount > 99
+                            ? "99+"
+                            : notificationBadgeCount}
+                        </span>
+                      )}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="w-80 overflow-hidden p-0"
                   >
-                    <Bell className="size-4" />
-                    {(notificationCount ?? 0) > 0 && (
-                      <span className="absolute -top-1 -right-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
-                        {(notificationCount ?? 0) > 99
-                          ? "99+"
-                          : notificationCount}
+                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                      <p className="text-sm font-semibold text-foreground">
+                        Notifications
+                      </p>
+                      <span className="text-[11px] text-muted-foreground">
+                        {notificationItems.length} active
                       </span>
+                    </div>
+                    {notificationItems.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+                        You&apos;re all caught up.
+                      </p>
+                    ) : (
+                      <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto">
+                        {notificationItems.map((item) => (
+                          <li key={item.id}>
+                            <DashboardLink
+                              href={item.href}
+                              onClick={() => setNotificationsOpen(false)}
+                              className="flex w-full items-start gap-2.5 px-4 py-3 transition hover:bg-accent"
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`mt-1 size-2 shrink-0 rounded-full ${
+                                  item.tone === "danger"
+                                    ? "bg-destructive"
+                                    : item.tone === "warning"
+                                      ? "bg-amber-500"
+                                      : "bg-primary"
+                                }`}
+                              />
+                              <span className="min-w-0">
+                                <span className="block text-xs font-semibold text-foreground">
+                                  {item.title}
+                                </span>
+                                <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+                                  {item.description}
+                                </span>
+                              </span>
+                            </DashboardLink>
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                  </DashboardLink>
-                )}
+                    {notificationHref !== undefined && (
+                      <div className="border-t border-border p-2">
+                        {notificationHref.startsWith("/dashboard") ? (
+                          <DashboardLink
+                            href={notificationHref}
+                            onClick={() => setNotificationsOpen(false)}
+                            className="flex w-full items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-accent"
+                          >
+                            Review pending
+                          </DashboardLink>
+                        ) : (
+                          <a
+                            href={notificationHref}
+                            onClick={() => setNotificationsOpen(false)}
+                            className="flex w-full items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-accent"
+                          >
+                            Review pending
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
                 <span className="hidden items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-medium text-muted-foreground sm:inline-flex">
                   <ShieldCheck className="size-3.5 text-primary" /> {today}
                 </span>
@@ -251,56 +349,7 @@ export function DashboardShell({
           </header>
 
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-6xl">
-              {notifications && notifications.length > 0 && (
-                <section
-                  aria-labelledby="dashboard-notifications-title"
-                  className="mb-5 rounded-2xl border border-border bg-card p-4"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <h2
-                      id="dashboard-notifications-title"
-                      className="text-sm font-semibold text-foreground"
-                    >
-                      Notifications
-                    </h2>
-                    <span className="text-[11px] text-muted-foreground">
-                      {notifications.length} active
-                    </span>
-                  </div>
-                  <ul className="mt-2 divide-y divide-border">
-                    {notifications.map((item) => (
-                      <li key={item.id}>
-                        <DashboardLink
-                          href={item.href}
-                          className="flex w-full items-start gap-2.5 py-2.5 transition hover:bg-accent"
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={`mt-1 size-2 shrink-0 rounded-full ${
-                              item.tone === "danger"
-                                ? "bg-destructive"
-                                : item.tone === "warning"
-                                  ? "bg-amber-500"
-                                  : "bg-primary"
-                            }`}
-                          />
-                          <span className="min-w-0">
-                            <span className="block text-xs font-semibold text-foreground">
-                              {item.title}
-                            </span>
-                            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
-                              {item.description}
-                            </span>
-                          </span>
-                        </DashboardLink>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-              {children}
-            </div>
+            <div className="mx-auto max-w-6xl">{children}</div>
           </main>
         </div>
       </div>

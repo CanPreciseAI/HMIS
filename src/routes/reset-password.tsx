@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import logo from "@/assets/canprecise-logo.png";
+import logo from "@/assets/canprecise-logo-DKiSxahp.png";
 
 export const Route = createFileRoute("/reset-password")({
   validateSearch: z.object({

@@ -53,6 +53,7 @@ declare
   v_rx_item1 uuid;
 
   v_charge_cons uuid; v_charge_bed uuid; v_charge_cbc uuid;
+  v_charge_hba1c uuid; v_charge_trop uuid; v_charge_creat uuid;
 
   v_inv1 uuid; v_inv2 uuid;
 
@@ -297,26 +298,43 @@ begin
   ---------------------------------------------------------------------------
   -- 9. Laboratory
   ---------------------------------------------------------------------------
-  insert into public.lab_test_catalog (tenant_id, test_code, name, specimen_type, department_id)
-  values (v_tenant, 'CBC', 'Complete blood count', 'blood', v_dept_lab)
+  insert into public.charge_catalog (tenant_id, charge_code, name, category, base_rate)
+  values
+    (v_tenant, 'LAB-CBC', 'Complete blood count', 'laboratory', 350),
+    (v_tenant, 'LAB-HBA1C', 'HbA1c', 'laboratory', 450),
+    (v_tenant, 'LAB-TROP', 'Troponin I', 'laboratory', 800),
+    (v_tenant, 'LAB-CREAT', 'Serum creatinine', 'laboratory', 300)
+  on conflict (tenant_id, charge_code) do nothing;
+
+  select id into v_charge_cbc from public.charge_catalog
+    where tenant_id = v_tenant and charge_code = 'LAB-CBC';
+  select id into v_charge_hba1c from public.charge_catalog
+    where tenant_id = v_tenant and charge_code = 'LAB-HBA1C';
+  select id into v_charge_trop from public.charge_catalog
+    where tenant_id = v_tenant and charge_code = 'LAB-TROP';
+  select id into v_charge_creat from public.charge_catalog
+    where tenant_id = v_tenant and charge_code = 'LAB-CREAT';
+
+  insert into public.lab_test_catalog (tenant_id, test_code, name, specimen_type, department_id, charge_id)
+  values (v_tenant, 'CBC', 'Complete blood count', 'blood', v_dept_lab, v_charge_cbc)
   on conflict (tenant_id, test_code) do nothing;
   select id into v_test_cbc from public.lab_test_catalog
     where tenant_id = v_tenant and test_code = 'CBC';
 
-  insert into public.lab_test_catalog (tenant_id, test_code, name, specimen_type, department_id)
-  values (v_tenant, 'HBA1C', 'HbA1c', 'blood', v_dept_lab)
+  insert into public.lab_test_catalog (tenant_id, test_code, name, specimen_type, department_id, charge_id)
+  values (v_tenant, 'HBA1C', 'HbA1c', 'blood', v_dept_lab, v_charge_hba1c)
   on conflict (tenant_id, test_code) do nothing;
   select id into v_test_hba1c from public.lab_test_catalog
     where tenant_id = v_tenant and test_code = 'HBA1C';
 
-  insert into public.lab_test_catalog (tenant_id, test_code, name, specimen_type, department_id)
-  values (v_tenant, 'TROP', 'Troponin I', 'blood', v_dept_lab)
+  insert into public.lab_test_catalog (tenant_id, test_code, name, specimen_type, department_id, charge_id)
+  values (v_tenant, 'TROP', 'Troponin I', 'blood', v_dept_lab, v_charge_trop)
   on conflict (tenant_id, test_code) do nothing;
   select id into v_test_trop from public.lab_test_catalog
     where tenant_id = v_tenant and test_code = 'TROP';
 
-  insert into public.lab_test_catalog (tenant_id, test_code, name, specimen_type, department_id)
-  values (v_tenant, 'CREAT', 'Serum creatinine', 'blood', v_dept_lab)
+  insert into public.lab_test_catalog (tenant_id, test_code, name, specimen_type, department_id, charge_id)
+  values (v_tenant, 'CREAT', 'Serum creatinine', 'blood', v_dept_lab, v_charge_creat)
   on conflict (tenant_id, test_code) do nothing;
   select id into v_test_creat from public.lab_test_catalog
     where tenant_id = v_tenant and test_code = 'CREAT';

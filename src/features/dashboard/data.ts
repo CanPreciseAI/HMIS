@@ -1171,6 +1171,101 @@ export async function loadMedicineCatalog(
   return data ?? [];
 }
 
+export type LabTestCatalogEntry = {
+  id: string;
+  test_code: string;
+  name: string;
+  specimen_type: string;
+  status: string;
+  chargeId: string;
+  price: number;
+};
+
+export async function loadLabTestCatalog(
+  tenantId: string,
+): Promise<LabTestCatalogEntry[]> {
+  if (!tenantId) {
+    throw new Error("Your workspace is missing its hospital ID.");
+  }
+  const { data, error } = await supabase
+    .from("lab_test_catalog")
+    .select("id, test_code, name, specimen_type, status, charge_id")
+    .eq("tenant_id", tenantId)
+    .order("name", { ascending: true })
+    .limit(500);
+  if (error) {
+    throw new Error(
+      `Could not load the hospital lab test catalog: ${error.message}`,
+    );
+  }
+
+  const rows = data ?? [];
+  const chargeIds = [...new Set(rows.map((row) => row.charge_id))];
+  const chargeResult = chargeIds.length
+    ? await supabase
+        .from("charge_catalog")
+        .select("id, base_rate")
+        .in("id", chargeIds)
+    : { data: [] as { id: string; base_rate: number }[], error: null };
+  if (chargeResult.error) {
+    throw new Error(
+      `Could not load laboratory test prices: ${chargeResult.error.message}`,
+    );
+  }
+  const prices = new Map(
+    (chargeResult.data ?? []).map((charge) => [
+      charge.id,
+      Number(charge.base_rate),
+    ]),
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    test_code: row.test_code,
+    name: row.name,
+    specimen_type: row.specimen_type,
+    status: row.status,
+    chargeId: row.charge_id,
+    price: prices.get(row.charge_id) ?? 0,
+  }));
+}
+
+export async function createLabTest(input: {
+  testCode: string;
+  name: string;
+  specimenType: string;
+  unitPrice: number;
+}): Promise<void> {
+  const { error } = await supabase.rpc("create_lab_test", {
+    _test_code: input.testCode,
+    _name: input.name,
+    _specimen_type: input.specimenType,
+    _price: input.unitPrice,
+  });
+  if (error) {
+    throw new Error(`Could not add the lab test: ${error.message}`);
+  }
+}
+
+export async function updateLabTest(input: {
+  testId: string;
+  name: string;
+  specimenType: string;
+  unitPrice: number;
+  status: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc("update_lab_test", {
+    _test_id: input.testId,
+    _name: input.name,
+    _specimen_type: input.specimenType,
+    _price: input.unitPrice,
+    _status: input.status,
+  });
+  if (error) {
+    throw new Error(`Could not update the lab test: ${error.message}`);
+  }
+}
+
 export async function loadMedicineCatalogStock(
   tenantId: string,
 ): Promise<MedicineCatalogStock[]> {
@@ -1547,6 +1642,7 @@ export type LabTestOption = {
   code: string;
   name: string;
   specimenType: string;
+  price: number;
 };
 
 export type LabTechnicianOption = {
@@ -1603,7 +1699,7 @@ export async function loadLabAssignmentWorkspace(
     loadInvoicePatientOptions(ctx),
     supabase
       .from("lab_test_catalog")
-      .select("id, test_code, name, specimen_type")
+      .select("id, test_code, name, specimen_type, charge_id")
       .eq("tenant_id", tenantId)
       .eq("status", "active")
       .order("name", { ascending: true })
@@ -1639,9 +1735,25 @@ export async function loadLabAssignmentWorkspace(
   ]);
   throwQueryErrors("lab assignment details", itemRes);
 
+  const testRows = testRes.data ?? [];
+  const testChargeIds = [...new Set(testRows.map((test) => test.charge_id))];
+  const testChargeRes = testChargeIds.length
+    ? await supabase
+        .from("charge_catalog")
+        .select("id, base_rate")
+        .in("id", testChargeIds)
+    : { data: [] as { id: string; base_rate: number }[], error: null };
+  throwQueryErrors("lab test prices", testChargeRes);
+  const testPrices = new Map(
+    (testChargeRes.data ?? []).map((charge) => [
+      charge.id,
+      Number(charge.base_rate),
+    ]),
+  );
+
   const items = itemRes.data ?? [];
   const tests = new Map(
-    (testRes.data ?? []).map((test) => [
+    testRows.map((test) => [
       test.id,
       { code: test.test_code, name: test.name },
     ]),
@@ -1661,11 +1773,12 @@ export async function loadLabAssignmentWorkspace(
 
   return {
     patients: patientRows,
-    tests: (testRes.data ?? []).map((test) => ({
+    tests: testRows.map((test) => ({
       id: test.id,
       code: test.test_code,
       name: test.name,
       specimenType: test.specimen_type,
+      price: testPrices.get(test.charge_id) ?? 0,
     })),
     technicians: (technicianRes.data ?? []).map((technician) => ({
       id: technician.employee_id,
@@ -2524,6 +2637,31 @@ export async function recordServiceCharge(
   const { data, error } = await supabase.rpc("record_service_charge", {
     _patient_id: input.patientId,
     _charge_id: input.chargeId,
+    _quantity: input.quantity,
+    _note: input.note.trim() || null,
+  });
+  if (error || !data) {
+    throw new Error(
+      `Could not record the service: ${error?.message ?? "unknown error"}`,
+    );
+  }
+  return data;
+}
+
+export async function recordTypedServiceCharge(
+  ctx: StaffContext,
+  input: {
+    patientId: string;
+    serviceName: string;
+    unitPrice: number;
+    quantity: number;
+    note: string;
+  },
+): Promise<string> {
+  const { data, error } = await supabase.rpc("record_custom_service_charge", {
+    _patient_id: input.patientId,
+    _service_name: input.serviceName.trim(),
+    _unit_price: input.unitPrice,
     _quantity: input.quantity,
     _note: input.note.trim() || null,
   });

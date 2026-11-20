@@ -11,6 +11,7 @@ import {
   createLabAssignment,
   formatDate,
   loadLabAssignmentWorkspace,
+  money,
   type DoctorData,
   type LabAssignmentPriority,
   type LabAssignmentWorkspace,
@@ -222,7 +223,8 @@ export function LabAssignmentsPanel({
                         <span className="min-w-0">
                           <span className="font-medium">{test.name}</span>
                           <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                            {test.code} · {test.specimenType}
+                            {test.code} · {test.specimenType} ·{" "}
+                            {money(test.price)}
                           </span>
                         </span>
                       </label>

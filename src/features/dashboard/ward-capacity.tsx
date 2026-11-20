@@ -32,11 +32,13 @@ export function WardCapacityManagement({
   wards,
   patients,
   canEdit,
+  canAdmit = canEdit,
 }: {
   ctx: StaffContext;
   wards: WardRow[];
   patients: WardPatientRow[];
   canEdit: boolean;
+  canAdmit?: boolean;
 }) {
   const [rows, setRows] = useState(patients);
   const [saving, setSaving] = useState<string | null>(null);
@@ -259,10 +261,10 @@ export function WardCapacityManagement({
         )}
       </Panel>
 
-      {canEdit && (
+      {canAdmit && (
         <Panel
           title="Admit a patient to a ward"
-          subtitle="Nurses and doctors pick the room, the nurse in charge and the doctor handling the patient."
+          subtitle="Nurses and administrators pick the room, the nurse in charge and the doctor handling the patient."
         >
           {optionsLoading ? (
             <div className="grid place-items-center py-8 text-muted-foreground">

@@ -12,7 +12,6 @@ import { DashboardShell, PageHeading } from "./shell";
 import { DOCTOR_NAV } from "./doctor-nav";
 import { useDashboardData } from "./use-dashboard-data";
 import { EmptyState, Panel, StatCard, StatusPill } from "./ui";
-import { MedicineRequestsPanel } from "./medicine-requests";
 import { YourPatientsPanel } from "./patient-history";
 import { DoctorScheduleCalendar } from "./doctor-schedule-calendar";
 import {
@@ -56,7 +55,7 @@ export function DoctorDashboard({ ctx }: { ctx: StaffContext }) {
       />
 
       <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
-        <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="max-h-[92vh] w-[calc(100vw-1.5rem)] max-w-[1400px] overflow-y-auto p-4 sm:p-6">
           <DialogHeader className="pr-8">
             <DialogTitle>Your calendar</DialogTitle>
             <DialogDescription>
@@ -102,16 +101,18 @@ export function DoctorDashboard({ ctx }: { ctx: StaffContext }) {
             />
           </div>
 
+          <div className="mt-5">
+            <Panel
+              id="schedule"
+              title="Your schedule"
+              subtitle="A full month of your clinic. Select any day to review its appointments."
+            >
+              <DoctorScheduleCalendar ctx={ctx} />
+            </Panel>
+          </div>
+
           <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
             <div className="space-y-5">
-              <Panel
-                id="schedule"
-                title="Your schedule"
-                subtitle="See how busy your month is, then select a day to review its appointments."
-              >
-                <DoctorScheduleCalendar ctx={ctx} />
-              </Panel>
-
               <YourPatientsPanel
                 ctx={ctx}
                 patients={data.patients}
@@ -194,9 +195,6 @@ export function DoctorDashboard({ ctx }: { ctx: StaffContext }) {
                 )}
               </Panel>
             </div>
-          </div>
-          <div className="mt-5">
-            <MedicineRequestsPanel ctx={ctx} />
           </div>
         </>
       )}

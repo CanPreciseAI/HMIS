@@ -8,6 +8,7 @@ import {
 import {
   Check,
   Edit2,
+  FlaskConical,
   Link2,
   Package,
   Plus,
@@ -18,17 +19,22 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  createLabTest,
   loadInventoryLocations,
+  loadLabTestCatalog,
   loadMedicineCatalogStock,
   loadMedicineInventoryAdminData,
   loadMedicineCatalog,
   loadMedicineStockDetails,
+  money,
   recordMedicineStock,
+  updateLabTest,
   type InventoryLocationOption,
   type MedicineCatalogEntry,
   type MedicineCatalogStock,
   type MedicineInventoryItem,
   type MedicineInventoryMapping,
+  type LabTestCatalogEntry,
   type MedicineStockDetail,
   type StaffContext,
 } from "./data";
@@ -212,6 +218,385 @@ export function MedicineCatalogReference({
             search
               ? "Try another name, code, strength or dosage form."
               : "Active medicines added by your hospital administrator will appear here."
+          }
+        />
+      )}
+    </Panel>
+  );
+}
+
+export function LabTestCatalogPanel({ ctx }: { ctx: StaffContext }) {
+  const tenantId = ctx.tenantId ?? "";
+  const [entries, setEntries] = useState<LabTestCatalogEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >("all");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<LabTestCatalogEntry | null>(null);
+  const [form, setForm] = useState({
+    test_code: "",
+    name: "",
+    specimen_type: "",
+    price: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!tenantId) {
+      setEntries([]);
+      return;
+    }
+    setEntries(null);
+    setError(null);
+    try {
+      setEntries(await loadLabTestCatalog(tenantId));
+    } catch (cause) {
+      setEntries([]);
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not load the hospital lab test catalog.",
+      );
+    }
+  }, [tenantId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const filtered = (entries ?? []).filter((entry) => {
+    const query = search.trim().toLowerCase();
+    const matchesQuery =
+      !query ||
+      [entry.name, entry.test_code, entry.specimen_type]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    const matchesStatus =
+      statusFilter === "all" || entry.status === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
+
+  function startCreate() {
+    setEditing(null);
+    setForm({ test_code: "", name: "", specimen_type: "", price: "" });
+    setFormError(null);
+    setFormOpen(true);
+  }
+
+  function startEdit(entry: LabTestCatalogEntry) {
+    setEditing(entry);
+    setForm({
+      test_code: entry.test_code,
+      name: entry.name,
+      specimen_type: entry.specimen_type,
+      price: String(entry.price),
+    });
+    setFormError(null);
+    setFormOpen(true);
+  }
+
+  function resetForm() {
+    setEditing(null);
+    setForm({ test_code: "", name: "", specimen_type: "", price: "" });
+    setFormError(null);
+    setFormOpen(false);
+  }
+
+  async function saveEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const price = Number(form.price);
+    if (
+      !form.name.trim() ||
+      !form.specimen_type.trim() ||
+      (!editing && !form.test_code.trim())
+    ) {
+      setFormError("Enter a test code, name and specimen type.");
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      setFormError("Enter a price of zero or more.");
+      return;
+    }
+
+    setSaving(true);
+    setFormError(null);
+    try {
+      if (editing) {
+        await updateLabTest({
+          testId: editing.id,
+          name: form.name.trim(),
+          specimenType: form.specimen_type.trim(),
+          unitPrice: price,
+          status: editing.status,
+        });
+        toast.success(`${form.name.trim()} updated`);
+      } else {
+        await createLabTest({
+          testCode: form.test_code.trim(),
+          name: form.name.trim(),
+          specimenType: form.specimen_type.trim(),
+          unitPrice: price,
+        });
+        toast.success(`${form.name.trim()} added to the laboratory catalog`);
+      }
+      resetForm();
+      await refresh();
+    } catch (cause) {
+      setFormError(
+        cause instanceof Error ? cause.message : "Could not save the lab test.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleStatus(entry: LabTestCatalogEntry) {
+    const nextStatus = entry.status === "active" ? "inactive" : "active";
+    setSaving(true);
+    try {
+      await updateLabTest({
+        testId: entry.id,
+        name: entry.name,
+        specimenType: entry.specimen_type,
+        unitPrice: entry.price,
+        status: nextStatus,
+      });
+      toast.success(
+        `${entry.name} ${nextStatus === "active" ? "activated" : "deactivated"}`,
+      );
+      await refresh();
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error
+          ? cause.message
+          : "Could not update the lab test status.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Panel
+      title="Laboratory test catalog"
+      subtitle="Tests and prices shared by doctors, the laboratory and billing."
+      action={
+        <button
+          type="button"
+          onClick={startCreate}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+        >
+          <Plus className="size-4" /> Add lab test
+        </button>
+      }
+    >
+      {error && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg bg-destructive/5 p-3 text-sm text-destructive"
+        >
+          {error}
+        </p>
+      )}
+
+      {formOpen && (
+        <form
+          onSubmit={saveEntry}
+          className="mb-5 rounded-xl border border-border bg-muted/20 p-4"
+        >
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-foreground">
+              {editing ? "Edit lab test" : "Add a lab test"}
+            </h3>
+            <button
+              type="button"
+              aria-label="Close lab test form"
+              onClick={resetForm}
+              className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs font-medium text-foreground">
+              Test code
+              <input
+                required
+                disabled={Boolean(editing)}
+                value={form.test_code}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    test_code: event.target.value,
+                  }))
+                }
+                placeholder="e.g. CBC"
+                className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+              />
+            </label>
+            <label className="block text-xs font-medium text-foreground">
+              Test name
+              <input
+                required
+                value={form.name}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="e.g. Complete blood count"
+                className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+            <label className="block text-xs font-medium text-foreground">
+              Specimen type
+              <input
+                required
+                value={form.specimen_type}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    specimen_type: event.target.value,
+                  }))
+                }
+                placeholder="e.g. blood, urine, stool"
+                className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+            <label className="block text-xs font-medium text-foreground">
+              Price (₹)
+              <input
+                required
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.price}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    price: event.target.value,
+                  }))
+                }
+                placeholder="e.g. 350"
+                className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+          </div>
+          {formError && (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              {formError}
+            </p>
+          )}
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="h-9 rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+            >
+              <Check className="size-4" />
+              {saving ? "Saving…" : editing ? "Save changes" : "Save lab test"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+        <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input px-3 text-muted-foreground focus-within:ring-2 focus-within:ring-ring">
+          <Search aria-hidden="true" className="size-4 shrink-0" />
+          <span className="sr-only">Search lab test catalog</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by test name, code or specimen"
+            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+        <label className="sr-only" htmlFor="lab-test-status-filter">
+          Filter lab tests by status
+        </label>
+        <select
+          id="lab-test-status-filter"
+          value={statusFilter}
+          onChange={(event) =>
+            setStatusFilter(event.target.value as typeof statusFilter)
+          }
+          className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      {entries === null ? (
+        <p
+          className="py-6 text-center text-sm text-muted-foreground"
+          role="status"
+        >
+          Loading lab test catalog…
+        </p>
+      ) : filtered.length ? (
+        <ul className="divide-y divide-border">
+          {filtered.map((entry) => (
+            <li
+              key={entry.id}
+              className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {entry.name}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {entry.test_code} · {entry.specimen_type} ·{" "}
+                  {money(entry.price)}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill status={entry.status} />
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => startEdit(entry)}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-60"
+                >
+                  <Edit2 className="size-3.5" /> Edit
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void toggleStatus(entry)}
+                  className="h-8 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-60"
+                >
+                  {entry.status === "active" ? "Deactivate" : "Activate"}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState
+          icon={FlaskConical}
+          title={
+            search || statusFilter !== "all"
+              ? "No matching lab tests"
+              : "No lab tests in the catalog"
+          }
+          description={
+            search || statusFilter !== "all"
+              ? "Try another test name, code, specimen or status."
+              : "Add a test and its price to make it orderable and billable."
           }
         />
       )}
@@ -880,6 +1265,7 @@ export function MedicineCatalogManagement({
           />
         )}
       </Panel>
+      <LabTestCatalogPanel ctx={ctx} />
       {mappingEditorEntry && (
         <MedicineInventoryLinkDialog
           medicine={mappingEditorEntry}

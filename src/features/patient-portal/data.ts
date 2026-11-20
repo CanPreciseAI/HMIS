@@ -87,6 +87,14 @@ type PatientPayment = {
   receivedAt: string | null;
 };
 
+type PatientInvoiceItem = {
+  id: string;
+  invoiceId: string;
+  description: string;
+  quantity: number;
+  amount: number;
+};
+
 export type PatientPortalData = {
   patientName: string;
   accessPending: boolean;
@@ -99,6 +107,7 @@ export type PatientPortalData = {
   labResults: PatientLabResult[];
   prescriptions: PatientPrescription[];
   invoices: PatientInvoice[];
+  invoiceItems: PatientInvoiceItem[];
   payments: PatientPayment[];
 };
 
@@ -154,6 +163,7 @@ export async function loadPatientPortalData(
       labResults: [],
       prescriptions: [],
       invoices: [],
+      invoiceItems: [],
       payments: [],
     };
   }
@@ -239,11 +249,13 @@ export async function loadPatientPortalData(
   const labOrderIds = labOrders.map((row) => row.id);
   const radiologyOrderIds = radiologyOrders.map((row) => row.id);
 
+  const invoiceIds = invoices.map((row) => row.id);
   const [
     diagnosisResult,
     labItemResult,
     radiologyReportResult,
     prescriptionResult,
+    invoiceItemResult,
   ] = await Promise.all([
     encounterIds.length
       ? supabase
@@ -279,6 +291,13 @@ export async function loadPatientPortalData(
           .order("created_at", { ascending: false })
           .limit(20)
       : Promise.resolve({ data: [], error: null }),
+    invoiceIds.length
+      ? supabase
+          .from("invoice_items")
+          .select("id, invoice_id, description, quantity, line_total")
+          .in("invoice_id", invoiceIds)
+          .order("created_at")
+      : Promise.resolve({ data: [], error: null }),
   ]);
   const diagnoses = requireData("diagnoses", diagnosisResult);
   const labItems = requireData("lab orders", labItemResult);
@@ -287,6 +306,7 @@ export async function loadPatientPortalData(
     radiologyReportResult,
   );
   const prescriptions = requireData("prescriptions", prescriptionResult);
+  const invoiceItems = requireData("invoice items", invoiceItemResult);
   const labItemIds = labItems.map((row) => row.id);
   const testIds = [...new Set(labItems.map((row) => row.test_id))];
   const prescriptionIds = prescriptions.map((row) => row.id);
@@ -427,6 +447,13 @@ export async function loadPatientPortalData(
       amount: Number(row.net_amount),
       status: row.status,
       issuedAt: row.issued_at,
+    })),
+    invoiceItems: invoiceItems.map((row) => ({
+      id: row.id,
+      invoiceId: row.invoice_id,
+      description: row.description ?? "Service",
+      quantity: Number(row.quantity),
+      amount: Number(row.line_total),
     })),
     payments: payments.map((row) => ({
       id: row.id,

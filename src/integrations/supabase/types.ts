@@ -1961,6 +1961,7 @@ export type Database = {
 
       lab_test_catalog: {
         Row: {
+          charge_id: string;
           created_at: string;
           department_id: string;
           id: string;
@@ -1972,6 +1973,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          charge_id: string;
           created_at?: string;
           department_id: string;
           id?: string;
@@ -1983,6 +1985,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          charge_id?: string;
           created_at?: string;
           department_id?: string;
           id?: string;
@@ -4620,6 +4623,25 @@ export type Database = {
         };
         Returns: { lab_order_id: string; item_count: number }[];
       };
+      create_lab_test: {
+        Args: {
+          _test_code: string;
+          _name: string;
+          _specimen_type: string;
+          _price: number;
+        };
+        Returns: string;
+      };
+      update_lab_test: {
+        Args: {
+          _test_id: string;
+          _name: string;
+          _specimen_type: string;
+          _price: number;
+          _status: string;
+        };
+        Returns: undefined;
+      };
       update_my_encounter_status: {
         Args: { _encounter_id: string; _status: string };
         Returns: string;
@@ -4892,6 +4914,16 @@ export type Database = {
           _note: string | null;
           _patient_id: string;
           _quantity: number;
+        };
+        Returns: string;
+      };
+      record_custom_service_charge: {
+        Args: {
+          _patient_id: string;
+          _service_name: string;
+          _unit_price: number;
+          _quantity: number;
+          _note: string | null;
         };
         Returns: string;
       };

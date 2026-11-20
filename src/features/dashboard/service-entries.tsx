@@ -12,14 +12,12 @@ import {
   createInvoiceFromCharges,
   formatDate,
   humanise,
-  loadInvoiceChargeOptions,
   loadInvoicePatientOptions,
   loadPharmacyMedicines,
   loadServiceCharges,
   money,
   recordMedicineCharge,
-  recordServiceCharge,
-  type InvoiceChargeOption,
+  recordTypedServiceCharge,
   type InvoicePatientOption,
   type PharmacyMedicine,
   type ServiceChargeRow,
@@ -54,14 +52,14 @@ const STATUS_CLASS: Record<string, string> = {
  */
 export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
   const [patients, setPatients] = useState<InvoicePatientOption[]>([]);
-  const [services, setServices] = useState<InvoiceChargeOption[]>([]);
+  const [serviceName, setServiceName] = useState("");
+  const [servicePrice, setServicePrice] = useState("");
   const [medicines, setMedicines] = useState<PharmacyMedicine[]>([]);
   const [entries, setEntries] = useState<ServiceChargeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [patientId, setPatientId] = useState("");
-  const [serviceId, setServiceId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -86,17 +84,14 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
     setLoading(true);
     setError("");
     try {
-      const [patientRows, serviceRows, medicineRows, entryRows] =
-        await Promise.all([
-          loadInvoicePatientOptions(ctx),
-          loadInvoiceChargeOptions(ctx),
-          isPharmacist
-            ? loadPharmacyMedicines(ctx)
-            : Promise.resolve([] as PharmacyMedicine[]),
-          loadServiceCharges(ctx),
-        ]);
+      const [patientRows, medicineRows, entryRows] = await Promise.all([
+        loadInvoicePatientOptions(ctx),
+        isPharmacist
+          ? loadPharmacyMedicines(ctx)
+          : Promise.resolve([] as PharmacyMedicine[]),
+        loadServiceCharges(ctx),
+      ]);
       setPatients(patientRows);
-      setServices(serviceRows);
       setMedicines(medicineRows);
       setEntries(entryRows);
       setPatientId((current) => current || patientRows[0]?.id || "");
@@ -137,16 +132,28 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
   const discountValue = Number(discount) || 0;
   const taxValue = Number(tax) || 0;
   const billTotal = Math.max(0, billSubtotal - discountValue + taxValue);
-  const selectedService =
-    services.find((service) => service.id === serviceId) ?? null;
+  const servicePriceValue = Number(servicePrice);
+  const quantityValue = Number(quantity);
+  const serviceAmount =
+    Number.isFinite(servicePriceValue) &&
+    servicePriceValue >= 0 &&
+    Number.isFinite(quantityValue) &&
+    quantityValue > 0
+      ? servicePriceValue * quantityValue
+      : 0;
   const selectedMedicine =
     medicines.find((medicine) => medicine.id === medicineId) ?? null;
 
   async function addService(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const qty = Number(quantity);
-    if (!patientId || !serviceId) {
-      toast.error("Choose the patient and the service you provided.");
+    const price = Number(servicePrice);
+    if (!patientId || !serviceName.trim()) {
+      toast.error("Choose the patient and enter the service provided.");
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      toast.error("Enter a price of zero or more.");
       return;
     }
     if (!Number.isFinite(qty) || qty <= 0) {
@@ -156,14 +163,18 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
 
     setSaving(true);
     try {
-      await recordServiceCharge(ctx, {
+      await recordTypedServiceCharge(ctx, {
         patientId,
-        chargeId: serviceId,
+        serviceName: serviceName.trim(),
+        unitPrice: price,
         quantity: qty,
         note,
       });
-      toast.success("Service added — it stays open until reception marks it");
-      setServiceId("");
+      toast.success(
+        `${serviceName.trim()} added — it stays open until reception marks it`,
+      );
+      setServiceName("");
+      setServicePrice("");
       setQuantity("1");
       setNote("");
       await refresh();
@@ -320,33 +331,35 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
               </select>
             </label>
 
-            {selectedPatient && (
+            {!isPharmacist && selectedPatient && (
               <form
                 onSubmit={(event) => void addService(event)}
-                className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3 sm:grid-cols-2 xl:grid-cols-4"
+                className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3 sm:grid-cols-2 xl:grid-cols-5"
               >
                 <label className="text-xs font-medium text-foreground sm:col-span-2">
                   Service provided
-                  <select
+                  <input
                     required
-                    value={serviceId}
-                    onChange={(event) =>
-                      setServiceId(event.currentTarget.value)
-                    }
-                    disabled={saving || services.length === 0}
+                    value={serviceName}
+                    onChange={(event) => setServiceName(event.target.value)}
+                    placeholder="e.g. Wound dressing, ECG, home visit"
+                    disabled={saving}
                     className={fieldClass}
-                  >
-                    <option value="">
-                      {services.length
-                        ? "Choose a service"
-                        : "No price list yet"}
-                    </option>
-                    {services.map((service) => (
-                      <option key={service.id} value={service.id}>
-                        {service.name} · {money(service.unitPrice)}
-                      </option>
-                    ))}
-                  </select>
+                  />
+                </label>
+                <label className="text-xs font-medium text-foreground">
+                  Unit price
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={servicePrice}
+                    onChange={(event) => setServicePrice(event.target.value)}
+                    placeholder="0.00"
+                    disabled={saving}
+                    className={fieldClass}
+                  />
                 </label>
                 <label className="text-xs font-medium text-foreground">
                   Quantity
@@ -361,7 +374,7 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
                     className={fieldClass}
                   />
                 </label>
-                <label className="text-xs font-medium text-foreground">
+                <label className="text-xs font-medium text-foreground sm:col-span-2 xl:col-span-5">
                   Note (optional)
                   <input
                     value={note}
@@ -371,15 +384,16 @@ export function ServiceEntryPanel({ ctx }: { ctx: StaffContext }) {
                     className={fieldClass}
                   />
                 </label>
-                <div className="flex items-end justify-between gap-3 sm:col-span-2 xl:col-span-4">
+                <div className="flex items-end justify-between gap-3 sm:col-span-2 xl:col-span-5">
                   <p className="text-xs text-muted-foreground">
-                    {selectedService
-                      ? `Amount ${money(selectedService.unitPrice * (Number(quantity) || 0))}`
-                      : "Pick a service to see the amount."}
+                    Amount{" "}
+                    <span className="font-semibold text-foreground">
+                      {money(serviceAmount)}
+                    </span>
                   </p>
                   <button
                     type="submit"
-                    disabled={saving || !serviceId}
+                    disabled={saving || !serviceName.trim() || !servicePrice}
                     className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
                   >
                     {saving ? (
