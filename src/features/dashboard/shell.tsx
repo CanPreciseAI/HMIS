@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import logo from "@/assets/canprecise-logo-DKiSxahp.png";
 import { ROLE_LABELS, type AdminNotification, type StaffContext } from "./data";
+import { ActionHistory } from "./action-history";
+import { ArogyaBot } from "@/features/arogya-bot/arogya-bot";
 import { Avatar } from "./ui";
 import {
   Popover,
@@ -15,6 +17,36 @@ import {
 } from "@/components/ui/popover";
 
 export type NavItem = { label: string; href: string; icon: LucideIcon };
+
+const READ_NOTIFICATIONS_KEY = "canprecise-read-notifications";
+
+/**
+ * A notification is marked read once its item is clicked and stays in the list
+ * as history. The title is part of the key, so when the underlying count
+ * changes (a new request, a new patient) the notice becomes a new item and
+ * shows as unread again.
+ */
+function notificationKey(item: AdminNotification) {
+  return `${item.id}::${item.title}`;
+}
+
+function readReadNotifications(): Record<string, true> {
+  try {
+    const raw = window.sessionStorage.getItem(READ_NOTIFICATIONS_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return {};
+    const read: Record<string, true> = {};
+    for (const [key, value] of Object.entries(
+      parsed as Record<string, unknown>,
+    )) {
+      if (value === true) read[key] = true;
+    }
+    return read;
+  } catch {
+    return {};
+  }
+}
 
 function DashboardLink({
   href,
@@ -93,6 +125,37 @@ export function DashboardShell({
   );
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [readNotifications, setReadNotifications] = useState<
+    Record<string, true>
+  >({});
+
+  useEffect(() => {
+    setReadNotifications(readReadNotifications());
+  }, []);
+
+  function markNotificationRead(item: AdminNotification) {
+    setReadNotifications((current) => {
+      const next: Record<string, true> = {
+        ...current,
+        [notificationKey(item)]: true,
+      };
+      // Keep only the notices this page is still showing, so the store does not
+      // grow forever as counts change.
+      const visibleKeys = new Set(notificationItems.map(notificationKey));
+      for (const key of Object.keys(next)) {
+        if (!visibleKeys.has(key)) delete next[key];
+      }
+      try {
+        window.sessionStorage.setItem(
+          READ_NOTIFICATIONS_KEY,
+          JSON.stringify(next),
+        );
+      } catch {
+        // A browser that blocks storage still keeps the in-memory read state.
+      }
+      return next;
+    });
+  }
   async function handleSignOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
@@ -122,10 +185,16 @@ export function DashboardShell({
     month: "short",
   });
   const notificationItems = notifications ?? [];
-  const notificationBadgeCount = Math.max(
-    notificationItems.length,
-    notificationCount ?? 0,
+  const unreadNotifications = notificationItems.filter(
+    (item) => !readNotifications[notificationKey(item)],
   );
+  const readItems = notificationItems.filter(
+    (item) => readNotifications[notificationKey(item)],
+  );
+  const orderedNotifications = [...unreadNotifications, ...readItems];
+  const notificationBadgeCount = notificationItems.length
+    ? unreadNotifications.length
+    : Math.max(notificationCount ?? 0, 0);
 
   return (
     <div className="min-h-screen bg-[oklch(0.975_0.01_185)]">
@@ -245,43 +314,71 @@ export function DashboardShell({
                         Notifications
                       </p>
                       <span className="text-[11px] text-muted-foreground">
-                        {notificationItems.length} active
+                        {unreadNotifications.length} unread
+                        {readItems.length > 0
+                          ? ` · ${readItems.length} read`
+                          : ""}
                       </span>
                     </div>
-                    {notificationItems.length === 0 ? (
+                    {orderedNotifications.length === 0 ? (
                       <p className="px-4 py-6 text-center text-xs text-muted-foreground">
-                        You&apos;re all caught up.
+                        No notifications right now.
                       </p>
                     ) : (
                       <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto">
-                        {notificationItems.map((item) => (
-                          <li key={item.id}>
-                            <DashboardLink
-                              href={item.href}
-                              onClick={() => setNotificationsOpen(false)}
-                              className="flex w-full items-start gap-2.5 px-4 py-3 transition hover:bg-accent"
-                            >
-                              <span
-                                aria-hidden="true"
-                                className={`mt-1 size-2 shrink-0 rounded-full ${
-                                  item.tone === "danger"
-                                    ? "bg-destructive"
-                                    : item.tone === "warning"
-                                      ? "bg-amber-500"
-                                      : "bg-primary"
+                        {orderedNotifications.map((item) => {
+                          const isRead = Boolean(
+                            readNotifications[notificationKey(item)],
+                          );
+                          return (
+                            <li key={notificationKey(item)}>
+                              <DashboardLink
+                                href={item.href}
+                                onClick={() => {
+                                  if (!isRead) markNotificationRead(item);
+                                  setNotificationsOpen(false);
+                                }}
+                                className={`flex w-full items-start gap-2.5 px-4 py-3 transition hover:bg-accent ${
+                                  isRead ? "bg-muted/20" : ""
                                 }`}
-                              />
-                              <span className="min-w-0">
-                                <span className="block text-xs font-semibold text-foreground">
-                                  {item.title}
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className={`mt-1 size-2 shrink-0 rounded-full ${
+                                    isRead
+                                      ? "bg-muted-foreground/30"
+                                      : item.tone === "danger"
+                                        ? "bg-destructive"
+                                        : item.tone === "warning"
+                                          ? "bg-amber-500"
+                                          : "bg-primary"
+                                  }`}
+                                />
+                                <span className="min-w-0">
+                                  <span className="flex flex-wrap items-center gap-1.5">
+                                    <span
+                                      className={`text-xs font-semibold ${
+                                        isRead
+                                          ? "text-muted-foreground"
+                                          : "text-foreground"
+                                      }`}
+                                    >
+                                      {item.title}
+                                    </span>
+                                    {isRead && (
+                                      <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                        Read
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+                                    {item.description}
+                                  </span>
                                 </span>
-                                <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
-                                  {item.description}
-                                </span>
-                              </span>
-                            </DashboardLink>
-                          </li>
-                        ))}
+                              </DashboardLink>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                     {notificationHref !== undefined && (
@@ -349,10 +446,14 @@ export function DashboardShell({
           </header>
 
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-6xl">{children}</div>
+            <div className="mx-auto max-w-6xl">
+              {children}
+              <ActionHistory ctx={ctx} />
+            </div>
           </main>
         </div>
       </div>
+      <ArogyaBot ctx={ctx} />
     </div>
   );
 }

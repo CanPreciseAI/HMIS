@@ -868,13 +868,16 @@ export function ServiceChargesPanel({ ctx }: { ctx: StaffContext }) {
                         <input
                           type="checkbox"
                           checked={checked}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            // Capture before the updater runs: React clears
+                            // currentTarget after the handler returns.
+                            const checked = event.currentTarget.checked;
                             setSelectedIds((current) =>
-                              event.currentTarget.checked
+                              checked
                                 ? [...current, row.id]
                                 : current.filter((id) => id !== row.id),
-                            )
-                          }
+                            );
+                          }}
                           className="size-4 accent-primary"
                         />
                         <span className="min-w-0">

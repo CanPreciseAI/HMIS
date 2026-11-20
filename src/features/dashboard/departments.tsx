@@ -29,10 +29,22 @@ export function DepartmentStaffManagement({
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState("all");
 
   useEffect(() => {
     setRows(departments);
   }, [departments]);
+
+  // If the chosen department disappears (removed or renamed away), fall back
+  // to showing every department together.
+  useEffect(() => {
+    if (
+      selectedDepartmentId !== "all" &&
+      !rows.some((row) => row.id === selectedDepartmentId)
+    ) {
+      setSelectedDepartmentId("all");
+    }
+  }, [rows, selectedDepartmentId]);
 
   const canManage = ctx.role === "hospital_admin" && Boolean(ctx.facilityId);
 
@@ -111,13 +123,22 @@ export function DepartmentStaffManagement({
     (row.name ?? "").toLowerCase().includes(query) ||
     row.employeeCode.toLowerCase().includes(query) ||
     (row.email ?? "").toLowerCase().includes(query);
-  const visibleStaff = staff.filter(matchesSearch);
+  const selectedDepartment =
+    rows.find((dept) => dept.id === selectedDepartmentId) ?? null;
+  const scopedStaff = selectedDepartment
+    ? staff.filter((row) => row.departmentId === selectedDepartment.id)
+    : staff;
+  const visibleStaff = scopedStaff.filter(matchesSearch);
   const unassigned = staff.filter(
     (row) => !row.departmentId || !departmentIds.has(row.departmentId),
   );
-  const visibleUnassigned = unassigned.filter(matchesSearch);
+  const visibleUnassigned = selectedDepartment
+    ? []
+    : unassigned.filter(matchesSearch);
   const knownStaff = new Set(staff.map((row) => row.departmentId));
-  const visibleDepartments = rows.filter(
+  const visibleDepartments = (
+    selectedDepartment ? [selectedDepartment] : rows
+  ).filter(
     (dept) =>
       !query ||
       staff.some((row) => row.departmentId === dept.id && matchesSearch(row)),
@@ -125,7 +146,8 @@ export function DepartmentStaffManagement({
   const noMatches =
     Boolean(query) &&
     visibleStaff.length === 0 &&
-    visibleDepartments.length === 0;
+    visibleDepartments.length === 0 &&
+    visibleUnassigned.length === 0;
 
   return (
     <div className="space-y-5">
@@ -212,34 +234,61 @@ export function DepartmentStaffManagement({
 
       {rows.length > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-2.5 focus-within:ring-2 focus-within:ring-ring">
-            <Search
-              aria-hidden="true"
-              className="size-4 shrink-0 text-muted-foreground"
-            />
-            <span className="sr-only">Search staff by name</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.currentTarget.value)}
-              placeholder="Search staff by name, code or email"
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                aria-label="Clear staff search"
-                className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground transition hover:text-foreground"
+          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-input bg-background px-2.5 focus-within:ring-2 focus-within:ring-ring sm:min-w-[15rem]">
+              <Building2
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted-foreground"
+              />
+              <span className="sr-only">Filter staff by department</span>
+              <select
+                value={selectedDepartmentId}
+                onChange={(event) =>
+                  setSelectedDepartmentId(event.currentTarget.value)
+                }
+                className="h-full min-w-0 flex-1 cursor-pointer bg-transparent text-sm font-medium text-foreground outline-none"
               >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </label>
-          {query && (
-            <p className="text-xs text-muted-foreground">
-              {visibleStaff.length} of {staff.length} staff match
-            </p>
-          )}
+                <option value="all">
+                  All departments ({staff.length} staff)
+                </option>
+                {rows.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name} (
+                    {staff.filter((row) => row.departmentId === dept.id).length}
+                    )
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-2.5 focus-within:ring-2 focus-within:ring-ring">
+              <Search
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted-foreground"
+              />
+              <span className="sr-only">Search staff by name</span>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.currentTarget.value)}
+                placeholder="Search staff by name, code or email"
+                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear staff search"
+                  className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground transition hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </label>
+          </div>
+          <p className="shrink-0 text-xs text-muted-foreground">
+            {selectedDepartment ? `${selectedDepartment.name} · ` : ""}
+            {visibleStaff.length} of {scopedStaff.length} staff
+            {query ? " match" : ""}
+          </p>
         </div>
       )}
 

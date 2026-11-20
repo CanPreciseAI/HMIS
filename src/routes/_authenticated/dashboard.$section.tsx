@@ -96,6 +96,11 @@ import { PatientFlowManagement } from "@/features/dashboard/patient-flow";
 import { DepartmentStaffManagement } from "@/features/dashboard/departments";
 import { WardCapacityManagement } from "@/features/dashboard/ward-capacity";
 import { WardVisualizationPanel } from "@/features/dashboard/ward-map";
+import { PatientHealthRecords } from "@/features/dashboard/health-records";
+import {
+  LabResultsReviewPanel,
+  SampleQueuePanel,
+} from "@/features/dashboard/lab-workflow";
 import { PatientApprovals } from "@/features/dashboard/patient-approvals";
 import { ReceptionAdmissionsPanel } from "@/features/dashboard/reception-admissions";
 import { DoctorAppointmentsPanel } from "@/features/dashboard/doctor-appointments";
@@ -133,6 +138,7 @@ type Section =
   | "ward-capacity"
   | "departments"
   | "medicine-catalog"
+  | "health-records"
   | "billing"
   | "staff-approvals"
   | "hospital-admin-approvals"
@@ -191,6 +197,12 @@ const SECTION_DETAILS: Record<
     role: ["hospital_admin"],
     title: "Medicine catalog",
     subtitle: "Maintain the shared medicine reference for your hospital.",
+  },
+  "health-records": {
+    role: ["hospital_admin", "doctor", "nurse"],
+    title: "Health records",
+    subtitle:
+      "Conditions, allergies and uploaded reports that follow the patient.",
   },
   billing: {
     role: ["hospital_admin"],
@@ -380,6 +392,11 @@ const NAV: Record<StaffContext["role"], NavItem[]> = {
   hospital_admin: [
     { label: "Overview", href: "/dashboard", icon: CalendarDays },
     {
+      label: "Health records",
+      href: "/dashboard/health-records",
+      icon: FileText,
+    },
+    {
       label: "Patient flow",
       href: "/dashboard/patient-flow",
       icon: CalendarRange,
@@ -406,6 +423,11 @@ const NAV: Record<StaffContext["role"], NavItem[]> = {
   nurse: [
     { label: "Overview", href: "/dashboard", icon: ClipboardList },
     { label: "Care queue", href: "/dashboard/care-queue", icon: ClipboardList },
+    {
+      label: "Health records",
+      href: "/dashboard/health-records",
+      icon: FileText,
+    },
     {
       label: "Ward capacity",
       href: "/dashboard/ward-capacity",
@@ -620,6 +642,7 @@ function DashboardSectionPage() {
     | WardBedsSectionData
     | WardSectionData
     | InsuranceData
+    | { healthRecords: true }
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -645,56 +668,62 @@ function DashboardSectionPage() {
             "This dashboard page is not available for your role.",
           );
         }
-        const result = [
-          "service-charges",
-          "billing",
-          "invoices",
-          "reception-billing",
-        ].includes(rawSection)
-          ? await loadFacilityInvoices(staffContext)
-          : rawSection === "ward-capacity" && staffContext.role !== "admin"
-            ? staffContext.role === "hospital_admin"
-              ? await loadAdminData(staffContext)
-              : await loadWardSectionData(staffContext)
-            : staffContext.role === "admin"
-              ? rawSection === "hospital-admin-approvals"
-                ? await loadHospitalAdminRequests()
-                : rawSection === "hospital-records"
-                  ? await loadPlatformHospitalRecords()
-                  : rawSection === "staff-records"
-                    ? await loadPlatformStaffRecords()
-                    : null
-              : staffContext.role === "hospital_admin"
-                ? rawSection === "medicine-catalog"
-                  ? {
-                      medicineCatalog: await loadMedicineCatalog(
-                        staffContext.tenantId ?? "",
-                      ),
-                    }
-                  : await loadHospitalAdminSectionData(staffContext, rawSection)
-                : staffContext.role === "doctor"
-                  ? rawSection === "invoices"
-                    ? await loadFacilityInvoices(staffContext)
-                    : await loadDoctorData(staffContext)
-                  : staffContext.role === "nurse"
-                    ? rawSection === "invoices"
-                      ? await loadFacilityInvoices(staffContext)
-                      : await loadNurseData(staffContext)
-                    : staffContext.role === "lab_technician"
+        const result =
+          rawSection === "health-records"
+            ? { healthRecords: true as const }
+            : [
+                  "service-charges",
+                  "billing",
+                  "invoices",
+                  "reception-billing",
+                ].includes(rawSection)
+              ? await loadFacilityInvoices(staffContext)
+              : rawSection === "ward-capacity" && staffContext.role !== "admin"
+                ? staffContext.role === "hospital_admin"
+                  ? await loadAdminData(staffContext)
+                  : await loadWardSectionData(staffContext)
+                : staffContext.role === "admin"
+                  ? rawSection === "hospital-admin-approvals"
+                    ? await loadHospitalAdminRequests()
+                    : rawSection === "hospital-records"
+                      ? await loadPlatformHospitalRecords()
+                      : rawSection === "staff-records"
+                        ? await loadPlatformStaffRecords()
+                        : null
+                  : staffContext.role === "hospital_admin"
+                    ? rawSection === "medicine-catalog"
+                      ? {
+                          medicineCatalog: await loadMedicineCatalog(
+                            staffContext.tenantId ?? "",
+                          ),
+                        }
+                      : await loadHospitalAdminSectionData(
+                          staffContext,
+                          rawSection,
+                        )
+                    : staffContext.role === "doctor"
                       ? rawSection === "invoices"
                         ? await loadFacilityInvoices(staffContext)
-                        : await loadLabTechnicianData(staffContext)
-                      : staffContext.role === "pharmacist"
+                        : await loadDoctorData(staffContext)
+                      : staffContext.role === "nurse"
                         ? rawSection === "invoices"
                           ? await loadFacilityInvoices(staffContext)
-                          : await loadPharmacistData(staffContext)
-                        : staffContext.role === "receptionist"
-                          ? rawSection === "reception-billing"
+                          : await loadNurseData(staffContext)
+                        : staffContext.role === "lab_technician"
+                          ? rawSection === "invoices"
                             ? await loadFacilityInvoices(staffContext)
-                            : await loadReceptionistData(staffContext)
-                          : staffContext.role === "insurance"
-                            ? await loadInsuranceData(staffContext)
-                            : null;
+                            : await loadLabTechnicianData(staffContext)
+                          : staffContext.role === "pharmacist"
+                            ? rawSection === "invoices"
+                              ? await loadFacilityInvoices(staffContext)
+                              : await loadPharmacistData(staffContext)
+                            : staffContext.role === "receptionist"
+                              ? rawSection === "reception-billing"
+                                ? await loadFacilityInvoices(staffContext)
+                                : await loadReceptionistData(staffContext)
+                              : staffContext.role === "insurance"
+                                ? await loadInsuranceData(staffContext)
+                                : null;
         if (!result)
           throw new Error("No dashboard modules are configured for your role.");
         if (!cancelled) setData(result);
@@ -1084,12 +1113,16 @@ function SectionContent({
     | InvoiceRow[]
     | WardBedsSectionData
     | WardSectionData
-    | InsuranceData;
+    | InsuranceData
+    | { healthRecords: true };
   ctx: StaffContext;
   reviewingHospitalRequest: string | null;
   onHospitalRequestReview: (id: string, approved: boolean) => void;
   onApprovalsChange: (approvals: ApprovalRow[]) => void;
 }) {
+  if (section === "health-records") {
+    return <PatientHealthRecords ctx={ctx} />;
+  }
   if (
     section === "medicine-catalog" &&
     isMedicineCatalogSectionData(data) &&
@@ -1270,10 +1303,10 @@ function SectionContent({
       />
     );
   }
-  if (
-    (section === "lab-assignments" || section === "results-to-review") &&
-    "critical" in data
-  ) {
+  if (section === "results-to-review") {
+    return <LabResultsReviewPanel ctx={ctx} />;
+  }
+  if (section === "lab-assignments" && "critical" in data) {
     return <LabAssignmentsPanel ctx={ctx} criticalResults={data.critical} />;
   }
   if (section === "recent-notes" && "notes" in data) {
@@ -1373,43 +1406,7 @@ function SectionContent({
     );
   }
   if (section === "sample-queue" && "pendingSamples" in data) {
-    return (
-      <Panel
-        title="Samples awaiting processing"
-        subtitle="Priority and accession details for open lab orders"
-      >
-        {data.queue.length ? (
-          data.queue.map((row) => (
-            <div
-              key={row.id}
-              className="flex flex-col gap-2 border-b border-border py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {row.test} · {row.patient}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {row.accession} · ordered{" "}
-                  {new Date(row.orderedAt).toLocaleString()}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusPill
-                  status={row.priority === "stat" ? "urgent" : row.priority}
-                />
-                <StatusPill status={row.status} />
-              </div>
-            </div>
-          ))
-        ) : (
-          <EmptyState
-            icon={TestTubes}
-            title="No samples waiting"
-            description="New laboratory orders will appear here."
-          />
-        )}
-      </Panel>
-    );
+    return <SampleQueuePanel ctx={ctx} />;
   }
   if (section === "lab-results" && "resultsToVerify" in data) {
     return (

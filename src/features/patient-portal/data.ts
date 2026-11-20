@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 type PatientRecord = {
   id: string;
+  tenantId: string;
   name: string;
   number: string;
   dateOfBirth: string;
@@ -182,7 +183,7 @@ export async function loadPatientPortalData(
   ] = await Promise.all([
     supabase
       .from("patients")
-      .select("id, name, patient_number, date_of_birth, sex, status")
+      .select("id, tenant_id, name, patient_number, date_of_birth, sex, status")
       .in("id", patientIds),
     supabase.rpc("patient_appointments"),
     supabase
@@ -357,6 +358,7 @@ export async function loadPatientPortalData(
     accessPending: false,
     patients: patients.map((row) => ({
       id: row.id,
+      tenantId: row.tenant_id,
       name: row.name,
       number: row.patient_number,
       dateOfBirth: row.date_of_birth,

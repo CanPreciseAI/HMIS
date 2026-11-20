@@ -210,13 +210,17 @@ export function LabAssignmentsPanel({
                         <input
                           type="checkbox"
                           checked={selectedTestIds.includes(test.id)}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            // Read the value before updating state: React clears
+                            // currentTarget once the handler returns, and the
+                            // updater runs later during the re-render.
+                            const checked = event.currentTarget.checked;
                             setSelectedTestIds((current) =>
-                              event.currentTarget.checked
+                              checked
                                 ? [...current, test.id]
                                 : current.filter((id) => id !== test.id),
-                            )
-                          }
+                            );
+                          }}
                           disabled={submitting}
                           className="mt-1 size-4 rounded border-input text-primary focus:ring-ring"
                         />

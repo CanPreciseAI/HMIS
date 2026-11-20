@@ -6,9 +6,11 @@ import {
   type FormEvent,
 } from "react";
 import {
+  AlertTriangle,
   Check,
   Edit2,
   FlaskConical,
+  Layers,
   Link2,
   Package,
   Plus,
@@ -20,8 +22,10 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createLabTest,
+  LOW_STOCK_THRESHOLD,
   loadInventoryLocations,
   loadLabTestCatalog,
+  loadLowStockMaterials,
   loadMedicineCatalogStock,
   loadMedicineInventoryAdminData,
   loadMedicineCatalog,
@@ -30,6 +34,7 @@ import {
   recordMedicineStock,
   updateLabTest,
   type InventoryLocationOption,
+  type LowStockMaterial,
   type MedicineCatalogEntry,
   type MedicineCatalogStock,
   type MedicineInventoryItem,
@@ -637,6 +642,11 @@ export function MedicineCatalogManagement({
   >(new Map());
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
+  const [materials, setMaterials] = useState<LowStockMaterial[]>([]);
+  const [materialsError, setMaterialsError] = useState<string | null>(null);
+  const [view, setView] = useState<"all" | "requests" | "catalog" | "lab">(
+    "all",
+  );
   const [mappingEditorEntry, setMappingEditorEntry] =
     useState<MedicineCatalogEntry | null>(null);
   const [stockEditorEntry, setStockEditorEntry] =
@@ -655,10 +665,10 @@ export function MedicineCatalogManagement({
       if (showLoading) setInventoryLoading(true);
       setInventoryError(null);
       try {
-        const adminData = await loadMedicineInventoryAdminData(
-          ctx.tenantId,
-          medicineIds,
-        );
+        const [adminData, lowStockMaterials] = await Promise.all([
+          loadMedicineInventoryAdminData(ctx.tenantId, medicineIds),
+          loadLowStockMaterials(ctx.tenantId),
+        ]);
         const stockDetails = await loadMedicineStockDetails(
           ctx.tenantId,
           medicineIds,
@@ -670,13 +680,21 @@ export function MedicineCatalogManagement({
         );
         setInventoryItems(adminData.items);
         setInventoryMappings(adminData.mappings);
+        setMaterials(lowStockMaterials);
+        setMaterialsError(null);
       } catch (cause) {
         setInventoryError(
           cause instanceof Error
             ? cause.message
             : "Could not load medicine stock and inventory links.",
         );
+        setMaterialsError(
+          cause instanceof Error
+            ? cause.message
+            : "Could not load low-stock materials.",
+        );
         setStockByMedicine(new Map());
+        setMaterials([]);
       } finally {
         setInventoryLoading(false);
       }
@@ -769,6 +787,32 @@ export function MedicineCatalogManagement({
       return matchesStatus && matchesSearch;
     });
   }, [entries, search, statusFilter]);
+
+  const lowStockMedicines = useMemo(() => {
+    return entries
+      .filter((entry) => entry.status === "active")
+      .map((entry) => {
+        const stock = stockByMedicine.get(entry.id);
+        if (!stock?.isMapped) return null;
+        return {
+          medicineId: entry.id,
+          name: entry.name,
+          code: entry.medicine_code,
+          available: stock.projectedAvailable,
+        };
+      })
+      .filter(
+        (
+          row,
+        ): row is {
+          medicineId: string;
+          name: string;
+          code: string;
+          available: number;
+        } => row !== null && row.available <= LOW_STOCK_THRESHOLD,
+      )
+      .sort((a, b) => a.available - b.available);
+  }, [entries, stockByMedicine]);
 
   if (ctx.role !== "hospital_admin" || !ctx.tenantId) {
     return (
@@ -947,325 +991,371 @@ export function MedicineCatalogManagement({
 
   return (
     <div className="space-y-5">
-      <MedicineRequestsPanel ctx={ctx} />
-      <Panel
-        title="Catalog entries"
-        subtitle="Medicine reference with live stock from inventory and pending prescriptions."
-        action={
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={startCreate}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-            >
-              <Plus className="size-4" /> Add medicine
-            </button>
-          </div>
-        }
-      >
-        {inventoryError && (
-          <p
-            role="alert"
-            className="mb-4 rounded-lg bg-destructive/5 p-3 text-sm text-destructive"
-          >
-            {inventoryError}
-          </p>
-        )}
-        {formOpen && (
-          <form
-            onSubmit={saveEntry}
-            className="mb-5 rounded-xl border border-border bg-muted/20 p-4"
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-foreground">
-                {editing ? "Edit medicine" : "Add a medicine"}
-              </h3>
-              <button
-                type="button"
-                aria-label="Close medicine form"
-                onClick={resetForm}
-                className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(
-                [
-                  ["medicine_code", "Medicine code", "e.g. AMOX-500"],
-                  ["name", "Medicine name", "e.g. Amoxicillin"],
-                  ["strength", "Strength", "e.g. 500 mg"],
-                  ["dosage_form", "Dosage form", "e.g. Capsule"],
-                ] as const
-              ).map(([key, label, placeholder]) => (
-                <label
-                  key={key}
-                  className="block text-xs font-medium text-foreground"
-                >
-                  {label}
-                  <input
-                    required
-                    value={form[key]}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        [key]: event.target.value,
-                      }))
-                    }
-                    placeholder={placeholder}
-                    className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </label>
-              ))}
-            </div>
-            {formError && (
-              <p role="alert" className="mt-3 text-sm text-destructive">
-                {formError}
+      <section className="rounded-2xl border border-border bg-card p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-8 place-items-center rounded-lg bg-secondary text-primary">
+              <Layers className="size-4" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">
+                Catalog sections
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                Pick one section, or keep every section together.
               </p>
-            )}
-            <div className="mt-4 flex justify-end gap-2">
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-xs font-medium text-foreground">
+            <span className="sr-only">Show catalog section</span>
+            <select
+              value={view}
+              onChange={(event) =>
+                setView(event.currentTarget.value as typeof view)
+              }
+              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-64"
+            >
+              <option value="all">Select all — every section</option>
+              <option value="requests">Medicine requests</option>
+              <option value="catalog">Medicine catalog</option>
+              <option value="lab">Laboratory catalog</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      {(view === "all" || view === "catalog") && (
+        <LowStockPanel
+          medicines={lowStockMedicines}
+          materials={materials}
+          loading={inventoryLoading}
+          error={materialsError ?? inventoryError}
+        />
+      )}
+
+      {(view === "all" || view === "requests") && (
+        <MedicineRequestsPanel ctx={ctx} />
+      )}
+      {(view === "all" || view === "catalog") && (
+        <Panel
+          title="Catalog entries"
+          subtitle="Medicine reference with live stock from inventory and pending prescriptions."
+          action={
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={resetForm}
-                className="h-9 rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-accent"
+                onClick={startCreate}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-              >
-                <Check className="size-4" />
-                {saving
-                  ? "Saving…"
-                  : editing
-                    ? "Save changes"
-                    : "Save medicine"}
+                <Plus className="size-4" /> Add medicine
               </button>
             </div>
-          </form>
-        )}
-
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row">
-          <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input px-3 text-muted-foreground focus-within:ring-2 focus-within:ring-ring">
-            <Search aria-hidden="true" className="size-4 shrink-0" />
-            <span className="sr-only">Search medicine catalog</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name, code or strength"
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-            />
-          </label>
-          <label className="sr-only" htmlFor="medicine-status-filter">
-            Filter by status
-          </label>
-          <select
-            id="medicine-status-filter"
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value as typeof statusFilter)
-            }
-            className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-
-        {filtered.length ? (
-          <>
-            <ul className="space-y-3 xl:hidden">
-              {filtered.map((entry) => (
-                <li
-                  key={entry.id}
-                  className="rounded-xl border border-border p-3.5"
+          }
+        >
+          {inventoryError && (
+            <p
+              role="alert"
+              className="mb-4 rounded-lg bg-destructive/5 p-3 text-sm text-destructive"
+            >
+              {inventoryError}
+            </p>
+          )}
+          {formOpen && (
+            <form
+              onSubmit={saveEntry}
+              className="mb-5 rounded-xl border border-border bg-muted/20 p-4"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-foreground">
+                  {editing ? "Edit medicine" : "Add a medicine"}
+                </h3>
+                <button
+                  type="button"
+                  aria-label="Close medicine form"
+                  onClick={resetForm}
+                  className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="break-words text-sm font-semibold text-foreground">
-                        {entry.name}
-                      </p>
-                      <p className="mt-1 break-words text-xs text-muted-foreground">
-                        {entry.medicine_code} · {entry.strength} ·{" "}
-                        {entry.dosage_form}
-                      </p>
-                    </div>
-                    <StatusPill status={entry.status} />
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <MedicineStockFigures
-                      stock={stockByMedicine.get(entry.id)}
-                      loading={inventoryLoading}
-                      error={Boolean(inventoryError)}
+                  <X className="size-4" />
+                </button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    ["medicine_code", "Medicine code", "e.g. AMOX-500"],
+                    ["name", "Medicine name", "e.g. Amoxicillin"],
+                    ["strength", "Strength", "e.g. 500 mg"],
+                    ["dosage_form", "Dosage form", "e.g. Capsule"],
+                  ] as const
+                ).map(([key, label, placeholder]) => (
+                  <label
+                    key={key}
+                    className="block text-xs font-medium text-foreground"
+                  >
+                    {label}
+                    <input
+                      required
+                      value={form[key]}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          [key]: event.target.value,
+                        }))
+                      }
+                      placeholder={placeholder}
+                      className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setStockEditorEntry(entry)}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <Package className="size-3.5" />
-                      Add stock
-                    </button>
-                    <button
-                      type="button"
-                      disabled={inventoryLoading}
-                      onClick={() => setMappingEditorEntry(entry)}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-                    >
-                      <Link2 className="size-3.5" />
-                      Inventory links
-                    </button>
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => startEdit(entry)}
-                      className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-input px-2 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-                    >
-                      <Edit2 className="size-3.5" /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void toggleStatus(entry)}
-                      className="h-9 rounded-lg border border-input px-2 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-                    >
-                      {entry.status === "active" ? "Deactivate" : "Activate"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => setDeleteEntry(entry)}
-                      className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-destructive/40 px-2 text-xs font-medium text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-                    >
-                      <Trash2 className="size-3.5" /> Remove
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </label>
+                ))}
+              </div>
+              {formError && (
+                <p role="alert" className="mt-3 text-sm text-destructive">
+                  {formError}
+                </p>
+              )}
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="h-9 rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-accent"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                >
+                  <Check className="size-4" />
+                  {saving
+                    ? "Saving…"
+                    : editing
+                      ? "Save changes"
+                      : "Save medicine"}
+                </button>
+              </div>
+            </form>
+          )}
 
-            <div className="hidden overflow-x-auto xl:block">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-border text-xs text-muted-foreground">
-                  <tr>
-                    <th scope="col" className="pb-2 pr-4 font-medium">
-                      Medicine
-                    </th>
-                    <th scope="col" className="pb-2 pr-4 font-medium">
-                      On hand
-                    </th>
-                    <th scope="col" className="pb-2 pr-4 font-medium">
-                      Available
-                    </th>
-                    <th scope="col" className="pb-2 pr-4 font-medium">
-                      Status
-                    </th>
-                    <th scope="col" className="pb-2 text-right font-medium">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filtered.map((entry) => (
-                    <tr key={entry.id}>
-                      <td className="py-3 pr-4">
-                        <p className="font-medium text-foreground">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+            <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input px-3 text-muted-foreground focus-within:ring-2 focus-within:ring-ring">
+              <Search aria-hidden="true" className="size-4 shrink-0" />
+              <span className="sr-only">Search medicine catalog</span>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by name, code or strength"
+                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              />
+            </label>
+            <label className="sr-only" htmlFor="medicine-status-filter">
+              Filter by status
+            </label>
+            <select
+              id="medicine-status-filter"
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as typeof statusFilter)
+              }
+              className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+
+          {filtered.length ? (
+            <>
+              <ul className="space-y-3 xl:hidden">
+                {filtered.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="rounded-xl border border-border p-3.5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-foreground">
                           {entry.name}
                         </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <p className="mt-1 break-words text-xs text-muted-foreground">
                           {entry.medicine_code} · {entry.strength} ·{" "}
                           {entry.dosage_form}
                         </p>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <StockFigure
-                          stock={stockByMedicine.get(entry.id)}
-                          loading={inventoryLoading}
-                          error={Boolean(inventoryError)}
-                          figure="onHand"
-                        />
-                      </td>
-                      <td className="py-3 pr-4">
-                        <StockFigure
-                          stock={stockByMedicine.get(entry.id)}
-                          loading={inventoryLoading}
-                          error={Boolean(inventoryError)}
-                          figure="projectedAvailable"
-                        />
-                      </td>
-                      <td className="py-3 pr-4">
-                        <StatusPill status={entry.status} />
-                      </td>
-                      <td className="py-3 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setStockEditorEntry(entry)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary px-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
-                          >
-                            <Package className="size-3.5" /> Stock
-                          </button>
-                          <button
-                            type="button"
-                            disabled={inventoryLoading}
-                            onClick={() => setMappingEditorEntry(entry)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-60"
-                          >
-                            <Link2 className="size-3.5" /> Links
-                          </button>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => startEdit(entry)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-60"
-                          >
-                            <Edit2 className="size-3.5" /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => void toggleStatus(entry)}
-                            className="h-8 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-60"
-                          >
-                            {entry.status === "active"
-                              ? "Deactivate"
-                              : "Activate"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => setDeleteEntry(entry)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-destructive/40 px-2.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-60"
-                          >
-                            <Trash2 className="size-3.5" /> Remove
-                          </button>
-                        </div>
-                      </td>
+                      </div>
+                      <StatusPill status={entry.status} />
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      <MedicineStockFigures
+                        stock={stockByMedicine.get(entry.id)}
+                        loading={inventoryLoading}
+                        error={Boolean(inventoryError)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setStockEditorEntry(entry)}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <Package className="size-3.5" />
+                        Add stock
+                      </button>
+                      <button
+                        type="button"
+                        disabled={inventoryLoading}
+                        onClick={() => setMappingEditorEntry(entry)}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                      >
+                        <Link2 className="size-3.5" />
+                        Inventory links
+                      </button>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => startEdit(entry)}
+                        className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-input px-2 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                      >
+                        <Edit2 className="size-3.5" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void toggleStatus(entry)}
+                        className="h-9 rounded-lg border border-input px-2 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                      >
+                        {entry.status === "active" ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => setDeleteEntry(entry)}
+                        className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-destructive/40 px-2 text-xs font-medium text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                      >
+                        <Trash2 className="size-3.5" /> Remove
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="hidden overflow-x-auto xl:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-border text-xs text-muted-foreground">
+                    <tr>
+                      <th scope="col" className="pb-2 pr-4 font-medium">
+                        Medicine
+                      </th>
+                      <th scope="col" className="pb-2 pr-4 font-medium">
+                        On hand
+                      </th>
+                      <th scope="col" className="pb-2 pr-4 font-medium">
+                        Available
+                      </th>
+                      <th scope="col" className="pb-2 pr-4 font-medium">
+                        Status
+                      </th>
+                      <th scope="col" className="pb-2 text-right font-medium">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        ) : (
-          <EmptyState
-            title={
-              entries.length ? "No matching medicines" : "Catalog is empty"
-            }
-            description={
-              entries.length
-                ? "Try another search or status filter."
-                : "Add a medicine to make the hospital-wide catalog available to clinical teams."
-            }
-          />
-        )}
-      </Panel>
-      <LabTestCatalogPanel ctx={ctx} />
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filtered.map((entry) => (
+                      <tr key={entry.id}>
+                        <td className="py-3 pr-4">
+                          <p className="font-medium text-foreground">
+                            {entry.name}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {entry.medicine_code} · {entry.strength} ·{" "}
+                            {entry.dosage_form}
+                          </p>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <StockFigure
+                            stock={stockByMedicine.get(entry.id)}
+                            loading={inventoryLoading}
+                            error={Boolean(inventoryError)}
+                            figure="onHand"
+                          />
+                        </td>
+                        <td className="py-3 pr-4">
+                          <StockFigure
+                            stock={stockByMedicine.get(entry.id)}
+                            loading={inventoryLoading}
+                            error={Boolean(inventoryError)}
+                            figure="projectedAvailable"
+                          />
+                        </td>
+                        <td className="py-3 pr-4">
+                          <StatusPill status={entry.status} />
+                        </td>
+                        <td className="py-3 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setStockEditorEntry(entry)}
+                              className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary px-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+                            >
+                              <Package className="size-3.5" /> Stock
+                            </button>
+                            <button
+                              type="button"
+                              disabled={inventoryLoading}
+                              onClick={() => setMappingEditorEntry(entry)}
+                              className="inline-flex h-8 items-center gap-1 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-60"
+                            >
+                              <Link2 className="size-3.5" /> Links
+                            </button>
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => startEdit(entry)}
+                              className="inline-flex h-8 items-center gap-1 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-60"
+                            >
+                              <Edit2 className="size-3.5" /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => void toggleStatus(entry)}
+                              className="h-8 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-60"
+                            >
+                              {entry.status === "active"
+                                ? "Deactivate"
+                                : "Activate"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => setDeleteEntry(entry)}
+                              className="inline-flex h-8 items-center gap-1 rounded-lg border border-destructive/40 px-2.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-60"
+                            >
+                              <Trash2 className="size-3.5" /> Remove
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              title={
+                entries.length ? "No matching medicines" : "Catalog is empty"
+              }
+              description={
+                entries.length
+                  ? "Try another search or status filter."
+                  : "Add a medicine to make the hospital-wide catalog available to clinical teams."
+              }
+            />
+          )}
+        </Panel>
+      )}
+      {(view === "all" || view === "lab") && <LabTestCatalogPanel ctx={ctx} />}
       {mappingEditorEntry && (
         <MedicineInventoryLinkDialog
           medicine={mappingEditorEntry}
@@ -1624,6 +1714,145 @@ function MedicineStockDialog({
         </form>
       </section>
     </div>
+  );
+}
+
+function LowStockPanel({
+  medicines,
+  materials,
+  loading,
+  error,
+}: {
+  medicines: {
+    medicineId: string;
+    name: string;
+    code: string;
+    available: number;
+  }[];
+  materials: LowStockMaterial[];
+  loading: boolean;
+  error: string | null;
+}) {
+  const alerts = medicines.length + materials.length;
+  return (
+    <Panel
+      title="Low stock"
+      subtitle={`Medicines and lab materials at or below ${LOW_STOCK_THRESHOLD} units`}
+      action={
+        <span
+          className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ${
+            alerts
+              ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+              : "bg-secondary text-secondary-foreground"
+          }`}
+        >
+          <AlertTriangle className="size-3.5" aria-hidden="true" />
+          {alerts ? `${alerts} to reorder` : "All stocked"}
+        </span>
+      }
+    >
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-lg bg-destructive/5 p-3 text-sm text-destructive"
+        >
+          {error}
+        </p>
+      ) : loading ? (
+        <p
+          className="py-4 text-center text-sm text-muted-foreground"
+          role="status"
+        >
+          Checking stock levels…
+        </p>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <section>
+            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              <Package className="size-3.5" aria-hidden="true" /> Medicines (
+              {medicines.length})
+            </h3>
+            {medicines.length ? (
+              <ul className="divide-y divide-border">
+                {medicines.map((row) => (
+                  <li
+                    key={row.medicineId}
+                    className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {row.name}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {row.code}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${
+                        row.available <= 0
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                      }`}
+                    >
+                      {row.available <= 0
+                        ? "Out of stock"
+                        : `${formatQuantity(row.available)} left`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No medicines are below the threshold.
+              </p>
+            )}
+          </section>
+
+          <section>
+            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              <FlaskConical className="size-3.5" aria-hidden="true" /> Lab &
+              other materials ({materials.length})
+            </h3>
+            {materials.length ? (
+              <ul className="divide-y divide-border">
+                {materials.map((row) => (
+                  <li
+                    key={row.itemId}
+                    className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {row.name}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {row.code} · {row.category}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${
+                        row.available <= 0
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                      }`}
+                    >
+                      {row.available <= 0
+                        ? "Out of stock"
+                        : `${formatQuantity(row.available)} ${row.unit}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No lab materials are below the threshold. Materials appear here
+                once they are stocked in inventory and are not linked to a
+                medicine.
+              </p>
+            )}
+          </section>
+        </div>
+      )}
+    </Panel>
   );
 }
 

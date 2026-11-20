@@ -1,0 +1,366 @@
+==============================================================================
+ACTOR-WISE DATA EXPORT
+==============================================================================
+Hospital      : Apollo Hospital (Apollo Hospital)
+Generated     : Saturday, 21 November 2026 at 1:36 am
+Staff records : 42
+Tenant ID     : 6a90a963-329c-4b36-b66a-c48d65bd61bd
+Facility ID   : df829c3e-2d10-4110-9c13-86bce2a893a2
+
+HOSPITAL-WIDE TOTALS
+  Patients                 : 6
+  Active admissions        : 2
+  Encounters               : 3
+  Appointments             : 6
+  Invoices                 : 3
+  Payments received        : ₹200
+  Insurance policies       : 0
+  Insurance claims         : 0 (0 pending)
+  Beds occupied / active   : 2 / 24
+  Medicines in catalogue   : 33
+
+DEPARTMENTS AND HEADCOUNT
+  Administration                11 staff · 5 available
+  General                       22 staff · 11 available
+  Laboratory                     6 staff · 2 available
+  Radiology                      3 staff · 2 available
+
+------------------------------------------------------------------------------
+ACTOR: ADMINISTRATOR (admin)
+Dashboard sections: Overview, Departments, Staff approvals, Patient flow, Ward capacity, Pharmacy queue, Billing
+Accounts (5):
+  Aditya Rao <admin1@gmail.com> · DUM-ADM-1 · Administration · available · active · roles: admin
+  Swati Jain <admin2@gmail.com> · DUM-ADM-2 · Administration · busy · active · roles: admin
+  Rajesh Kamath <admin3@gmail.com> · DUM-ADM-3 · Administration · on_leave · active · roles: admin
+  Tanvi Shah <admin4@gmail.com> · DUM-ADM-4 · Administration · off_duty · active · roles: admin
+  Vikas Hegde <admin5@gmail.com> · DUM-ADM-5 · Administration · available · active · roles: admin
+Per-account data:
+  Aditya Rao <admin1@gmail.com> [DUM-ADM-1, Administration]
+      Patients in hospital          : 6
+      Active admissions             : 2
+      Staff records                 : 42
+      Payments received             : ₹200
+  Swati Jain <admin2@gmail.com> [DUM-ADM-2, Administration]
+      Patients in hospital          : 6
+      Active admissions             : 2
+      Staff records                 : 42
+      Payments received             : ₹200
+  Rajesh Kamath <admin3@gmail.com> [DUM-ADM-3, Administration]
+      Patients in hospital          : 6
+      Active admissions             : 2
+      Staff records                 : 42
+      Payments received             : ₹200
+  Tanvi Shah <admin4@gmail.com> [DUM-ADM-4, Administration]
+      Patients in hospital          : 6
+      Active admissions             : 2
+      Staff records                 : 42
+      Payments received             : ₹200
+  Vikas Hegde <admin5@gmail.com> [DUM-ADM-5, Administration]
+      Patients in hospital          : 6
+      Active admissions             : 2
+      Staff records                 : 42
+      Payments received             : ₹200
+
+------------------------------------------------------------------------------
+ACTOR: HOSPITAL ADMINISTRATOR
+Dashboard sections: Overview, Patient flow, Ward capacity, Departments, Stock & medicines, Billing, Staff approvals
+Accounts (1):
+  Mruja Shah <mruja.v.shah@gmail.com> · HADM-ce0d6b3f · Administration · available · active · roles: hospital_admin
+Per-account data:
+  Mruja Shah <mruja.v.shah@gmail.com> [HADM-ce0d6b3f, Administration]
+      Patients in hospital          : 6
+      Departments                   : 4
+      Staff records                 : 42
+      Beds occupied / active        : 2 / 24
+      Invoices                      : 3
+      Payments received             : ₹200
+
+------------------------------------------------------------------------------
+ACTOR: DOCTOR
+Dashboard sections: Overview, Wards, Today's schedule, Your patients, Lab assignments, Recent notes, Write prescription, Prescription history, Billing
+Accounts (6):
+  Dr. Rohan Mehta <doctor2@gmail.com> · DUM-DOC-2 · General · busy · active · roles: Doctor
+  Dr. Sneha Kulkarni <doctor5@gmail.com> · DUM-DOC-5 · General · available · active · roles: Doctor
+  Dr. Priya Nair <doctor3@gmail.com> · DUM-DOC-3 · Laboratory · on_leave · active · roles: Doctor
+  Dr. Ananya Rao <doctor1@gmail.com> · DUM-DOC-1 · Radiology · available · active · roles: Doctor
+  Dr. Karthik Reddy <doctor4@gmail.com> · DUM-DOC-4 · Radiology · off_duty · active · roles: Doctor
+  Kiran Singh <doc@gmail.com> · EMP-0005 · Radiology · available · active · roles: Doctor
+Per-account data:
+  Dr. Rohan Mehta <doctor2@gmail.com> [DUM-DOC-2, General]
+      Encounters handled            : 1
+      Appointments                  : 1
+      Prescriptions written         : 0
+      Lab orders placed             : 0
+      Clinical notes authored       : 0
+  Dr. Sneha Kulkarni <doctor5@gmail.com> [DUM-DOC-5, General]
+      Encounters handled            : 1
+      Appointments                  : 2
+      Prescriptions written         : 0
+      Lab orders placed             : 0
+      Clinical notes authored       : 0
+  Dr. Priya Nair <doctor3@gmail.com> [DUM-DOC-3, Laboratory]
+      Encounters handled            : 0
+      Appointments                  : 0
+      Prescriptions written         : 0
+      Lab orders placed             : 0
+      Clinical notes authored       : 0
+  Dr. Ananya Rao <doctor1@gmail.com> [DUM-DOC-1, Radiology]
+      Encounters handled            : 0
+      Appointments                  : 1
+      Prescriptions written         : 0
+      Lab orders placed             : 0
+      Clinical notes authored       : 0
+  Dr. Karthik Reddy <doctor4@gmail.com> [DUM-DOC-4, Radiology]
+      Encounters handled            : 0
+      Appointments                  : 0
+      Prescriptions written         : 0
+      Lab orders placed             : 0
+      Clinical notes authored       : 0
+  Kiran Singh <doc@gmail.com> [EMP-0005, Radiology]
+      Encounters handled            : 1
+      Appointments                  : 2
+      Prescriptions written         : 2
+      Lab orders placed             : 0
+      Clinical notes authored       : 1
+
+------------------------------------------------------------------------------
+ACTOR: NURSE
+Dashboard sections: Overview, Care queue, Ward capacity, Handoff notes, Billing
+Accounts (7):
+  Divya Menon <nurse1@gmail.com> · DUM-NUR-1 · General · available · active · roles: Nurse
+  Aarti Sharma <nurse2@gmail.com> · DUM-NUR-2 · General · busy · active · roles: Nurse
+  Rekha Pillai <nurse3@gmail.com> · DUM-NUR-3 · General · on_leave · active · roles: Nurse
+  Sunita Yadav <nurse4@gmail.com> · DUM-NUR-4 · General · off_duty · active · roles: Nurse
+  Neha Joshi <nurse5@gmail.com> · DUM-NUR-5 · General · available · active · roles: Nurse
+  Kumar <mrujashah287@gmail.com> · EMP-0003 · General · on_leave · active · roles: Nurse
+  Pawan <nurse@gmail.com> · EMP-0008 · General · available · active · roles: Nurse
+Per-account data:
+  Divya Menon <nurse1@gmail.com> [DUM-NUR-1, General]
+      Bed assignments handled       : 2
+      Patients currently assigned   : 1
+  Aarti Sharma <nurse2@gmail.com> [DUM-NUR-2, General]
+      Bed assignments handled       : 0
+      Patients currently assigned   : 0
+  Rekha Pillai <nurse3@gmail.com> [DUM-NUR-3, General]
+      Bed assignments handled       : 0
+      Patients currently assigned   : 0
+  Sunita Yadav <nurse4@gmail.com> [DUM-NUR-4, General]
+      Bed assignments handled       : 0
+      Patients currently assigned   : 0
+  Neha Joshi <nurse5@gmail.com> [DUM-NUR-5, General]
+      Bed assignments handled       : 2
+      Patients currently assigned   : 1
+  Kumar <mrujashah287@gmail.com> [EMP-0003, General]
+      Bed assignments handled       : 1
+      Patients currently assigned   : 0
+  Pawan <nurse@gmail.com> [EMP-0008, General]
+      Bed assignments handled       : 0
+      Patients currently assigned   : 0
+
+------------------------------------------------------------------------------
+ACTOR: RECEPTIONIST
+Dashboard sections: Overview, Wards, Appointments & doctor load, Patient admission, Patient approvals, Billing
+Accounts (6):
+  Ramesh Gupta <receptionist2@gmail.com> · DUM-REC-2 · Administration · busy · active · roles: Receptionist
+  Vivek Patil <receptionist4@gmail.com> · DUM-REC-4 · Administration · off_duty · active · roles: Receptionist
+  Pooja Shetty <receptionist1@gmail.com> · DUM-REC-1 · General · available · active · roles: Receptionist
+  Shruti Desai <receptionist3@gmail.com> · DUM-REC-3 · General · on_leave · active · roles: Receptionist
+  Meena Iyer <receptionist5@gmail.com> · DUM-REC-5 · General · available · active · roles: Receptionist
+  Manoj Kumar <recep@gmail.com> · EMP-0004 · General · available · active · roles: Receptionist
+Per-account data:
+  Ramesh Gupta <receptionist2@gmail.com> [DUM-REC-2, Administration]
+      Appointments in hospital      : 6
+      Patients registered           : 6
+      Active admissions             : 2
+  Vivek Patil <receptionist4@gmail.com> [DUM-REC-4, Administration]
+      Appointments in hospital      : 6
+      Patients registered           : 6
+      Active admissions             : 2
+  Pooja Shetty <receptionist1@gmail.com> [DUM-REC-1, General]
+      Appointments in hospital      : 6
+      Patients registered           : 6
+      Active admissions             : 2
+  Shruti Desai <receptionist3@gmail.com> [DUM-REC-3, General]
+      Appointments in hospital      : 6
+      Patients registered           : 6
+      Active admissions             : 2
+  Meena Iyer <receptionist5@gmail.com> [DUM-REC-5, General]
+      Appointments in hospital      : 6
+      Patients registered           : 6
+      Active admissions             : 2
+  Manoj Kumar <recep@gmail.com> [EMP-0004, General]
+      Appointments in hospital      : 6
+      Patients registered           : 6
+      Active admissions             : 2
+
+------------------------------------------------------------------------------
+ACTOR: PHARMACIST
+Dashboard sections: Overview, Prescription queue, Dispensing history, Stock on hand, Billing
+Accounts (6):
+  Sandeep Kulkarni <pharmacist1@gmail.com> · DUM-PHA-1 · General · available · active · roles: Pharmacist
+  Farah Sheikh <pharmacist2@gmail.com> · DUM-PHA-2 · General · busy · active · roles: Pharmacist
+  Nikhil Rao <pharmacist3@gmail.com> · DUM-PHA-3 · General · on_leave · active · roles: Pharmacist
+  Anjali Verma <pharmacist4@gmail.com> · DUM-PHA-4 · General · off_duty · active · roles: Pharmacist
+  Imran Sait <pharmacist5@gmail.com> · DUM-PHA-5 · General · available · active · roles: Pharmacist
+  Naveen <pharm@gmail.com> · EMP-0006 · General · available · active · roles: Pharmacist
+Per-account data:
+  Sandeep Kulkarni <pharmacist1@gmail.com> [DUM-PHA-1, General]
+      Dispenses recorded            : 0
+      Medicine requests raised      : 0
+      Medicines in catalogue        : 33
+  Farah Sheikh <pharmacist2@gmail.com> [DUM-PHA-2, General]
+      Dispenses recorded            : 0
+      Medicine requests raised      : 0
+      Medicines in catalogue        : 33
+  Nikhil Rao <pharmacist3@gmail.com> [DUM-PHA-3, General]
+      Dispenses recorded            : 0
+      Medicine requests raised      : 0
+      Medicines in catalogue        : 33
+  Anjali Verma <pharmacist4@gmail.com> [DUM-PHA-4, General]
+      Dispenses recorded            : 0
+      Medicine requests raised      : 0
+      Medicines in catalogue        : 33
+  Imran Sait <pharmacist5@gmail.com> [DUM-PHA-5, General]
+      Dispenses recorded            : 0
+      Medicine requests raised      : 0
+      Medicines in catalogue        : 33
+  Naveen <pharm@gmail.com> [EMP-0006, General]
+      Dispenses recorded            : 1
+      Medicine requests raised      : 0
+      Medicines in catalogue        : 33
+
+------------------------------------------------------------------------------
+ACTOR: LAB TECHNICIAN
+Dashboard sections: Overview, Wards, Sample queue, Results to verify, Billing
+Accounts (6):
+  Bahadur Singh <lab@gmail.com> · EMP-0007 · General · available · active · roles: Lab Technician
+  Suresh Babu <labtechnician1@gmail.com> · DUM-LAB-1 · Laboratory · available · active · roles: lab_technician
+  Latha Krishnan <labtechnician2@gmail.com> · DUM-LAB-2 · Laboratory · busy · active · roles: lab_technician
+  Manish Tiwari <labtechnician3@gmail.com> · DUM-LAB-3 · Laboratory · on_leave · active · roles: lab_technician
+  Deepa Nambiar <labtechnician4@gmail.com> · DUM-LAB-4 · Laboratory · off_duty · active · roles: lab_technician
+  Arvind Kumar <labtechnician5@gmail.com> · DUM-LAB-5 · Laboratory · available · active · roles: lab_technician
+Per-account data:
+  Bahadur Singh <lab@gmail.com> [EMP-0007, General]
+      Lab orders assigned           : 0
+      Results verified              : 0
+  Suresh Babu <labtechnician1@gmail.com> [DUM-LAB-1, Laboratory]
+      Lab orders assigned           : 0
+      Results verified              : 0
+  Latha Krishnan <labtechnician2@gmail.com> [DUM-LAB-2, Laboratory]
+      Lab orders assigned           : 0
+      Results verified              : 0
+  Manish Tiwari <labtechnician3@gmail.com> [DUM-LAB-3, Laboratory]
+      Lab orders assigned           : 0
+      Results verified              : 0
+  Deepa Nambiar <labtechnician4@gmail.com> [DUM-LAB-4, Laboratory]
+      Lab orders assigned           : 0
+      Results verified              : 0
+  Arvind Kumar <labtechnician5@gmail.com> [DUM-LAB-5, Laboratory]
+      Lab orders assigned           : 0
+      Results verified              : 0
+
+------------------------------------------------------------------------------
+ACTOR: INSURANCE
+Dashboard sections: Overview, Policies, Claims
+Accounts (5):
+  Ritu Malhotra <insurance1@gmail.com> · DUM-INS-1 · Administration · available · active · roles: insurance
+  Kavita Rane <insurance3@gmail.com> · DUM-INS-3 · Administration · on_leave · active · roles: insurance
+  Nisha Fernandes <insurance5@gmail.com> · DUM-INS-5 · Administration · available · active · roles: insurance
+  Sameer Khan <insurance2@gmail.com> · DUM-INS-2 · General · busy · active · roles: insurance
+  Ajay Bhat <insurance4@gmail.com> · DUM-INS-4 · General · off_duty · active · roles: insurance
+Per-account data:
+  Ritu Malhotra <insurance1@gmail.com> [DUM-INS-1, Administration]
+      Insurance policies            : 0
+      Claims filed                  : 0
+      Pending claims                : 0
+  Kavita Rane <insurance3@gmail.com> [DUM-INS-3, Administration]
+      Insurance policies            : 0
+      Claims filed                  : 0
+      Pending claims                : 0
+  Nisha Fernandes <insurance5@gmail.com> [DUM-INS-5, Administration]
+      Insurance policies            : 0
+      Claims filed                  : 0
+      Pending claims                : 0
+  Sameer Khan <insurance2@gmail.com> [DUM-INS-2, General]
+      Insurance policies            : 0
+      Claims filed                  : 0
+      Pending claims                : 0
+  Ajay Bhat <insurance4@gmail.com> [DUM-INS-4, General]
+      Insurance policies            : 0
+      Claims filed                  : 0
+      Pending claims                : 0
+
+------------------------------------------------------------------------------
+ACTOR: PATIENT (patient portal)
+Dashboard sections: Overview, Appointments, Prescriptions, Reports, Bills
+Accounts (6):
+  Prajvalakka <blazingshadow3461@gmail.com> · PAT-20261103-768B05 · relationship: self · access: active · patient status: active
+  Mahi Shah <pat1@gmail.com> · PAT-20261120-74B191 · relationship: self · access: active · patient status: active
+  Tisha Mittal <pat2@gmail.com> · PAT-20261120-C41D1D · relationship: self · access: active · patient status: active
+  Yash Chauhan <pat3@gmail.com> · PAT-20261120-2CC829 · relationship: self · access: active · patient status: active
+  Rajiv Batra <pat4@gmail.com> · PAT-20261120-3EB652 · relationship: self · access: active · patient status: active
+  Sachi Mishra <pat5@gmail.com> · PAT-20261120-30478A · relationship: self · access: active · patient status: active
+Per-account data:
+  Prajvalakka <blazingshadow3461@gmail.com> [PAT-20261103-768B05]
+      Appointments                  : 1
+      Encounters                    : 1
+      Admissions                    : 1
+      Prescriptions                 : 2
+      Invoices                      : 2
+      Payments made                 : ₹200.00
+  Mahi Shah <pat1@gmail.com> [PAT-20261120-74B191]
+      Appointments                  : 1
+      Encounters                    : 0
+      Admissions                    : 0
+      Prescriptions                 : 0
+      Invoices                      : 0
+      Payments made                 : ₹0.00
+  Tisha Mittal <pat2@gmail.com> [PAT-20261120-C41D1D]
+      Appointments                  : 1
+      Encounters                    : 1
+      Admissions                    : 2
+      Prescriptions                 : 0
+      Invoices                      : 0
+      Payments made                 : ₹0.00
+  Yash Chauhan <pat3@gmail.com> [PAT-20261120-2CC829]
+      Appointments                  : 1
+      Encounters                    : 0
+      Admissions                    : 0
+      Prescriptions                 : 0
+      Invoices                      : 0
+      Payments made                 : ₹0.00
+  Rajiv Batra <pat4@gmail.com> [PAT-20261120-3EB652]
+      Appointments                  : 1
+      Encounters                    : 0
+      Admissions                    : 0
+      Prescriptions                 : 0
+      Invoices                      : 0
+      Payments made                 : ₹0.00
+  Sachi Mishra <pat5@gmail.com> [PAT-20261120-30478A]
+      Appointments                  : 1
+      Encounters                    : 1
+      Admissions                    : 2
+      Prescriptions                 : 0
+      Invoices                      : 1
+      Payments made                 : ₹0.00
+------------------------------------------------------------------------------
+RECENT ACTIONS RECORDED (all actors)
+  21 Nov 2026, 1:23 am · Mruja Shah · update beds
+  21 Nov 2026, 1:23 am · Mruja Shah · insert admissions
+  21 Nov 2026, 1:23 am · Mruja Shah · insert bed_assignments
+  21 Nov 2026, 1:23 am · Mruja Shah · update beds
+  21 Nov 2026, 1:23 am · Mruja Shah · insert admissions
+  21 Nov 2026, 1:23 am · Mruja Shah · insert bed_assignments
+  21 Nov 2026, 1:23 am · Mruja Shah · update beds
+  21 Nov 2026, 1:23 am · Mruja Shah · update beds
+  21 Nov 2026, 1:21 am · Mruja Shah · update admissions
+  21 Nov 2026, 1:21 am · Mruja Shah · update bed_assignments
+  21 Nov 2026, 1:21 am · Mruja Shah · update beds
+  21 Nov 2026, 1:21 am · Mruja Shah · update beds
+  21 Nov 2026, 1:20 am · Mruja Shah · update admissions
+  21 Nov 2026, 1:20 am · Mruja Shah · update bed_assignments
+  21 Nov 2026, 1:20 am · Mruja Shah · update beds
+
+==============================================================================
+END OF EXPORT
+==============================================================================

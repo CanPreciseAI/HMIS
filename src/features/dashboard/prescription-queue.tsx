@@ -332,12 +332,15 @@ export function PrescriptionQueuePanel({ ctx }: { ctx: StaffContext }) {
                           max={row.remaining}
                           step="0.01"
                           value={quantity}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            // Capture before the updater runs: React clears
+                            // currentTarget after the handler returns.
+                            const value = event.currentTarget.value;
                             setQuantities((current) => ({
                               ...current,
-                              [row.id]: event.currentTarget.value,
-                            }))
-                          }
+                              [row.id]: value,
+                            }));
+                          }}
                           disabled={busyId === row.id}
                           className={`${fieldClass} ml-1`}
                           aria-label={`Quantity to dispense of ${row.medicine}`}

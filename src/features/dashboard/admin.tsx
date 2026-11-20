@@ -4,6 +4,7 @@ import {
   Building2,
   CalendarClock,
   ClipboardList,
+  FileText,
   Pill,
   Receipt,
   UserCheck,
@@ -36,6 +37,11 @@ import {
 
 const NAV: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: CalendarClock },
+  {
+    label: "Health records",
+    href: "/dashboard/health-records",
+    icon: FileText,
+  },
   {
     label: "Patient flow",
     href: "/dashboard/patient-flow",

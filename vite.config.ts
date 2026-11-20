@@ -13,6 +13,8 @@ export default defineConfig(({ command, mode }) => {
     "SUPABASE_SERVICE_ROLE_KEY",
     "CRON_SECRET",
     "CRON_SECRET_PREVIOUS",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
   ]) {
     if (process.env[name] === undefined && fileEnv[name] !== undefined) {
       process.env[name] = fileEnv[name];

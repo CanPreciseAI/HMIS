@@ -2557,6 +2557,58 @@ export type Database = {
         Relationships: [];
       };
 
+      patient_health_documents: {
+        Row: {
+          id: string;
+          patient_id: string;
+          tenant_id: string;
+          uploaded_by: string;
+          uploader_role: string;
+          title: string;
+          category: string;
+          file_path: string;
+          file_name: string;
+          mime_type: string | null;
+          file_size: number | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          patient_id: string;
+          tenant_id: string;
+          uploaded_by: string;
+          uploader_role: string;
+          title: string;
+          category?: string;
+          file_path: string;
+          file_name: string;
+          mime_type?: string | null;
+          file_size?: number | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          patient_id?: string;
+          tenant_id?: string;
+          uploaded_by?: string;
+          uploader_role?: string;
+          title?: string;
+          category?: string;
+          file_path?: string;
+          file_name?: string;
+          mime_type?: string | null;
+          file_size?: number | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
       patient_portal_access: {
         Row: {
           created_at: string;
@@ -4582,6 +4634,33 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      action_history: {
+        Args: {
+          _facility_id?: string | null;
+          _limit?: number | null;
+          _actor_id?: string | null;
+        };
+        Returns: {
+          event_id: string;
+          action: string;
+          entity_type: string;
+          entity_id: string | null;
+          actor_name: string;
+          actor_role: string | null;
+          detail: Json | null;
+          occurred_at: string;
+          tenant_name: string | null;
+        }[];
+      };
+      record_patient_diagnosis: {
+        Args: {
+          _patient_id: string;
+          _diagnosis_code: string;
+          _description?: string | null;
+          _diagnosis_type?: string | null;
+        };
+        Returns: undefined;
+      };
       facility_ward_staff: {
         Args: { _facility_id: string };
         Returns: {
@@ -4613,6 +4692,28 @@ export type Database = {
       facility_lab_technicians: {
         Args: { _facility_id: string };
         Returns: { employee_id: string; full_name: string }[];
+      };
+      discharge_ward_patient: {
+        Args: { _admission_id: string };
+        Returns: undefined;
+      };
+      update_lab_item_status: {
+        Args: { _item_id: string; _status: string };
+        Returns: undefined;
+      };
+      record_lab_result: {
+        Args: {
+          _item_id: string;
+          _result_value: string;
+          _unit?: string | null;
+          _reference_range?: string | null;
+          _critical?: boolean | null;
+        };
+        Returns: string;
+      };
+      verify_lab_result: {
+        Args: { _result_id: string };
+        Returns: undefined;
       };
       create_lab_assignment: {
         Args: {

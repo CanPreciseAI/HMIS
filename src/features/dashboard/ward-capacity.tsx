@@ -102,6 +102,27 @@ export function WardCapacityManagement({
     void refreshOptions();
   }, [refreshOptions]);
 
+  // Pick up admissions and discharges made by other actors without a reload.
+  useEffect(() => {
+    if (!canEdit) return;
+    function reload() {
+      if (document.visibilityState !== "visible") return;
+      void refreshRows();
+      void refreshOptions();
+    }
+    window.addEventListener("focus", reload);
+    const timer = window.setInterval(reload, 20_000);
+    return () => {
+      window.removeEventListener("focus", reload);
+      window.clearInterval(timer);
+    };
+  }, [canEdit, refreshOptions, refreshRows]);
+
+  /** Tell the ward board above that a bed was taken or freed. */
+  function notifyWardBoard() {
+    window.dispatchEvent(new CustomEvent("canprecise:ward-changed"));
+  }
+
   useEffect(() => {
     setRows(patients);
   }, [patients]);
@@ -127,46 +148,24 @@ export function WardCapacityManagement({
     }
 
     setSaving(row.assignmentId);
-    const endedAt = new Date().toISOString();
-    const { data: admissionUpdated, error } = await supabase
-      .from("admissions")
-      .update({ status: "discharged", discharged_at: endedAt })
-      .eq("id", row.admissionId)
-      .eq("tenant_id", ctx.tenantId)
-      .select("id")
-      .maybeSingle();
-    if (error || !admissionUpdated) {
-      setSaving(null);
-      toast.error(
-        error
-          ? `Could not discharge the patient: ${error.message}`
-          : "Admission could not be updated. Check your access and try again.",
-      );
-      return;
-    }
-
-    const { data: assignmentUpdated, error: assignmentError } = await supabase
-      .from("bed_assignments")
-      .update({ status: "ended", end_at: endedAt })
-      .eq("id", row.assignmentId)
-      .eq("status", "active")
-      .select("id")
-      .maybeSingle();
+    // One RPC does the whole discharge: the admission update is what nurses
+    // and doctors are allowed to make, and the discharge trigger ends the bed
+    // assignment and refreshes occupancy.
+    const { error } = await supabase.rpc("discharge_ward_patient", {
+      _admission_id: row.admissionId,
+    });
     setSaving(null);
-    if (assignmentError || !assignmentUpdated) {
-      toast.error(
-        assignmentError
-          ? `Patient discharged, but the bed could not be freed: ${assignmentError.message}`
-          : "Patient discharged, but the bed assignment could not be closed.",
-      );
+    if (error) {
+      toast.error(`Could not discharge the patient: ${error.message}`);
       return;
     }
 
     setRows((current) =>
       current.filter((item) => item.assignmentId !== row.assignmentId),
     );
-    toast.success(`${row.patient} discharged · room ${row.bed} is free`);
     await refreshOptions();
+    notifyWardBoard();
+    toast.success(`${row.patient} discharged · room ${row.bed} is free`);
   }
 
   async function admit(event: FormEvent<HTMLFormElement>) {
@@ -191,6 +190,7 @@ export function WardCapacityManagement({
       setAdmitNurseId("");
       setAdmitProviderId("");
       await Promise.all([refreshRows(), refreshOptions()]);
+      notifyWardBoard();
     } catch (cause) {
       toast.error(
         cause instanceof Error ? cause.message : "Could not admit the patient.",
@@ -224,6 +224,7 @@ export function WardCapacityManagement({
       toast.success(`${row.patient}'s ward assignment updated`);
       setEditingId(null);
       await Promise.all([refreshRows(), refreshOptions()]);
+      notifyWardBoard();
     } catch (cause) {
       toast.error(
         cause instanceof Error

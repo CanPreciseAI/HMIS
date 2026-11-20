@@ -28,6 +28,8 @@ import {
   StatCard,
   StatusPill,
 } from "@/features/dashboard/ui";
+import { ArogyaBot } from "@/features/arogya-bot/arogya-bot";
+import { PatientHealthDocumentsPanel } from "@/features/patient-portal/health-documents";
 
 export const Route = createFileRoute("/patient")({
   ssr: false,
@@ -297,17 +299,29 @@ function PatientPortal() {
 
                 <Panel
                   title="Health information"
-                  subtitle="Recorded allergies and recent observations"
+                  subtitle="Previous conditions, allergies and recent observations"
                 >
                   {data.allergies.length === 0 &&
+                  data.diagnoses.length === 0 &&
                   data.observations.length === 0 ? (
                     <EmptyState
                       icon={ShieldAlert}
                       title="No health information recorded"
-                      description="Allergies and observations recorded by your care team will be listed here."
+                      description="Conditions, allergies and observations recorded by your care team will be listed here."
                     />
                   ) : (
                     <div className="divide-y divide-border">
+                      {data.diagnoses.map((row) => (
+                        <div key={row.id} className="py-3 first:pt-0">
+                          <p className="text-sm font-semibold text-foreground">
+                            {row.description ?? row.code}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Condition · {row.code} · {row.type} ·{" "}
+                            {new Date(row.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      ))}
                       {data.allergies.map((row) => (
                         <div key={row.id} className="py-3 first:pt-0">
                           <p className="text-sm font-semibold text-foreground">
@@ -341,28 +355,17 @@ function PatientPortal() {
                 </Panel>
 
                 <Panel
-                  title="Diagnoses and test results"
-                  subtitle="Released information from your care team"
+                  title="Test results"
+                  subtitle="Released laboratory results from your care team"
                 >
-                  {data.diagnoses.length === 0 &&
-                  data.labResults.length === 0 ? (
+                  {data.labResults.length === 0 ? (
                     <EmptyState
                       icon={FileText}
                       title="No results available"
-                      description="Diagnoses and verified lab results will appear here when released."
+                      description="Verified lab results will appear here when released."
                     />
                   ) : (
                     <div className="divide-y divide-border">
-                      {data.diagnoses.map((row) => (
-                        <div key={row.id} className="py-3 first:pt-0">
-                          <p className="text-sm font-semibold text-foreground">
-                            {row.description ?? row.code}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {row.code} · {row.type}
-                          </p>
-                        </div>
-                      ))}
                       {data.labResults.map((row) => (
                         <div
                           key={row.id}
@@ -384,6 +387,13 @@ function PatientPortal() {
                     </div>
                   )}
                 </Panel>
+
+                {data.patients[0] && (
+                  <PatientHealthDocumentsPanel
+                    patientId={data.patients[0].id}
+                    tenantId={data.patients[0].tenantId}
+                  />
+                )}
 
                 <Panel
                   title="Prescriptions"
@@ -514,6 +524,7 @@ function PatientPortal() {
           )}
         </div>
       </main>
+      <ArogyaBot patientData={data} />
     </div>
   );
 }

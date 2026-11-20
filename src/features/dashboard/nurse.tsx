@@ -1,6 +1,7 @@
 import {
   BedDouble,
   ClipboardList,
+  FileText,
   NotebookPen,
   Pill,
   Receipt,
@@ -19,6 +20,11 @@ import { buildOverviewNotifications } from "./section-notifications";
 const NAV: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: ClipboardList },
   { label: "Care queue", href: "/dashboard/care-queue", icon: ClipboardList },
+  {
+    label: "Health records",
+    href: "/dashboard/health-records",
+    icon: FileText,
+  },
   { label: "Ward capacity", href: "/dashboard/ward-capacity", icon: BedDouble },
   {
     label: "Handoff notes",

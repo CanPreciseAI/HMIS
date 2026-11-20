@@ -1,0 +1,54 @@
+CanPreciseAI — demo staff logins (Apollo Hospital)
+Password for every account: cuarti2c
+
+Format: <actorname><i>@gmail.com (i = 1..5)
+
+DOCTOR
+  doctor1@gmail.com        Dr. Ananya Rao         Radiology        9845012301   DUM-DOC-1
+  doctor2@gmail.com        Dr. Rohan Mehta        General          9845012302   DUM-DOC-2
+  doctor3@gmail.com        Dr. Priya Nair         Laboratory       9845012303   DUM-DOC-3
+  doctor4@gmail.com        Dr. Karthik Reddy      Radiology        9845012304   DUM-DOC-4
+  doctor5@gmail.com        Dr. Sneha Kulkarni     General          9845012305   DUM-DOC-5
+NURSE
+  nurse1@gmail.com         Divya Menon            General          9845012311   DUM-NUR-1
+  nurse2@gmail.com         Aarti Sharma           General          9845012312   DUM-NUR-2
+  nurse3@gmail.com         Rekha Pillai           General          9845012313   DUM-NUR-3
+  nurse4@gmail.com         Sunita Yadav           General          9845012314   DUM-NUR-4
+  nurse5@gmail.com         Neha Joshi             General          9845012315   DUM-NUR-5
+RECEPTIONIST
+  receptionist1@gmail.com  Pooja Shetty           General          9845012321   DUM-REC-1
+  receptionist2@gmail.com  Ramesh Gupta           Administration   9845012322   DUM-REC-2
+  receptionist3@gmail.com  Shruti Desai           General          9845012323   DUM-REC-3
+  receptionist4@gmail.com  Vivek Patil            Administration   9845012324   DUM-REC-4
+  receptionist5@gmail.com  Meena Iyer             General          9845012325   DUM-REC-5
+PHARMACIST
+  pharmacist1@gmail.com    Sandeep Kulkarni       General          9845012331   DUM-PHA-1
+  pharmacist2@gmail.com    Farah Sheikh           General          9845012332   DUM-PHA-2
+  pharmacist3@gmail.com    Nikhil Rao             General          9845012333   DUM-PHA-3
+  pharmacist4@gmail.com    Anjali Verma           General          9845012334   DUM-PHA-4
+  pharmacist5@gmail.com    Imran Sait             General          9845012335   DUM-PHA-5
+LAB TECHNICIAN
+  labtechnician1@gmail.com Suresh Babu            Laboratory       9845012341   DUM-LAB-1
+  labtechnician2@gmail.com Latha Krishnan         Laboratory       9845012342   DUM-LAB-2
+  labtechnician3@gmail.com Manish Tiwari          Laboratory       9845012343   DUM-LAB-3
+  labtechnician4@gmail.com Deepa Nambiar          Laboratory       9845012344   DUM-LAB-4
+  labtechnician5@gmail.com Arvind Kumar           Laboratory       9845012345   DUM-LAB-5
+INSURANCE
+  insurance1@gmail.com     Ritu Malhotra          Administration   9845012351   DUM-INS-1
+  insurance2@gmail.com     Sameer Khan            General          9845012352   DUM-INS-2
+  insurance3@gmail.com     Kavita Rane            Administration   9845012353   DUM-INS-3
+  insurance4@gmail.com     Ajay Bhat              General          9845012354   DUM-INS-4
+  insurance5@gmail.com     Nisha Fernandes        Administration   9845012355   DUM-INS-5
+PLATFORM ADMINISTRATOR
+  prajvalakka021@gmail.com Prajval Akka           All hospitals            —   EMP-0001
+
+HOSPITAL ADMINISTRATOR (one per hospital)
+  mruja.v.shah@gmail.com   Mruja Shah             Apollo Hospital (main)   —   HADM-ce0d6b3f
+  admin1@gmail.com         Aditya Rao             Demo Hospital 1          9845012371   DUM-ADM-1
+  admin2@gmail.com         Swati Jain             Demo Hospital 2          9845012372   DUM-ADM-2
+  admin3@gmail.com         Rajesh Kamath          Demo Hospital 3          9845012373   DUM-ADM-3
+  admin4@gmail.com         Tanvi Shah             Demo Hospital 4          9845012374   DUM-ADM-4
+  admin5@gmail.com         Vikas Hegde            Demo Hospital 5          9845012375   DUM-ADM-5
+  hosadm@gmail.com         Pawan Kher             Ramaiah Medical Hospital —   HADM-cd1222b8
+
+Total accounts: 40

@@ -4459,6 +4459,90 @@ export async function loadLowStockMedicines(
     .sort((a, b) => a.available - b.available);
 }
 
+export type LowStockMaterial = {
+  itemId: string;
+  code: string;
+  name: string;
+  category: string;
+  unit: string;
+  available: number;
+};
+
+/**
+ * Inventory items that are not linked to a medicine (laboratory reagents,
+ * consumables and other materials) whose unreserved stock is at or below the
+ * alert threshold.
+ */
+export async function loadLowStockMaterials(
+  tenantId: string,
+  threshold = LOW_STOCK_THRESHOLD,
+): Promise<LowStockMaterial[]> {
+  if (!tenantId) return [];
+  const { data: items, error } = await supabase
+    .from("inventory_items")
+    .select("id, item_code, name, category, unit_of_measure")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .order("name", { ascending: true });
+  if (error) {
+    throw new Error(`Could not load inventory items: ${error.message}`);
+  }
+  const itemIds = (items ?? []).map((item) => item.id);
+  if (!itemIds.length) return [];
+
+  const [mappingRes, balanceRes] = await Promise.all([
+    supabase
+      .from("medicine_inventory_map")
+      .select("item_id")
+      .in("item_id", itemIds)
+      .eq("status", "active"),
+    supabase
+      .from("inventory_balances")
+      .select("item_id, quantity_on_hand, quantity_reserved")
+      .in("item_id", itemIds),
+  ]);
+  if (mappingRes.error) {
+    throw new Error(
+      `Could not load medicine inventory links: ${mappingRes.error.message}`,
+    );
+  }
+  if (balanceRes.error) {
+    throw new Error(
+      `Could not load inventory balances: ${balanceRes.error.message}`,
+    );
+  }
+
+  const medicineItemIds = new Set(
+    (mappingRes.data ?? []).map((mapping) => mapping.item_id),
+  );
+  const availableByItem = new Map<string, number>();
+  for (const balance of balanceRes.data ?? []) {
+    const available =
+      Number(balance.quantity_on_hand) - Number(balance.quantity_reserved);
+    availableByItem.set(
+      balance.item_id,
+      (availableByItem.get(balance.item_id) ?? 0) + available,
+    );
+  }
+
+  return (items ?? [])
+    .filter(
+      (item) =>
+        !medicineItemIds.has(item.id) &&
+        !(item.category ?? "").toLowerCase().includes("medicine"),
+    )
+    .map((item) => ({
+      itemId: item.id,
+      code: item.item_code,
+      name: item.name,
+      category: item.category || "Material",
+      unit: item.unit_of_measure,
+      available: availableByItem.get(item.id) ?? 0,
+    }))
+    .filter((row) => row.available <= threshold)
+    .sort((a, b) => a.available - b.available);
+}
+
 export type PlatformOverview = {
   hospitalsTotal: number;
   hospitalsActive: number;

@@ -16,6 +16,11 @@ import type { NavItem } from "./shell";
  */
 export const DOCTOR_NAV: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: CalendarDays },
+  {
+    label: "Health records",
+    href: "/dashboard/health-records",
+    icon: FileText,
+  },
   { label: "Wards", href: "/dashboard/ward-capacity", icon: BedDouble },
   {
     label: "Today's schedule",

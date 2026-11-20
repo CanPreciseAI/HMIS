@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   BedDouble,
   CheckCircle2,
@@ -115,6 +115,41 @@ export function WardVisualizationPanel({
   useEffect(() => {
     setRows(beds);
   }, [beds]);
+
+  // Wards and beds are read from the database rather than page-load data so a
+  // discharge (here or by another actor) frees the room immediately.
+  const reloadBeds = useCallback(async () => {
+    if (!ctx.tenantId || !ctx.facilityId) return;
+    try {
+      const [bedRows, wardRows] = await Promise.all([
+        loadWardBeds(ctx),
+        loadWards(ctx),
+      ]);
+      setRows(bedRows);
+      setWardRows(wardRows);
+    } catch {
+      // Keep the last known board if a background refresh fails.
+    }
+  }, [ctx]);
+
+  useEffect(() => {
+    if (!ctx.tenantId || !ctx.facilityId) return;
+    function reload() {
+      void reloadBeds();
+    }
+    window.addEventListener("canprecise:ward-changed", reload);
+    window.addEventListener("focus", reload);
+    // Realtime is not enabled for beds, so poll while the board is visible to
+    // pick up admissions and discharges made by other actors.
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void reloadBeds();
+    }, 20_000);
+    return () => {
+      window.removeEventListener("canprecise:ward-changed", reload);
+      window.removeEventListener("focus", reload);
+      window.clearInterval(timer);
+    };
+  }, [ctx.tenantId, ctx.facilityId, reloadBeds]);
 
   useEffect(() => {
     setWardRows(wards);
