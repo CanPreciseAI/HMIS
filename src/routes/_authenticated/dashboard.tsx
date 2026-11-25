@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   createFileRoute,
   Outlet,
+  useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
@@ -25,6 +26,24 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   }),
   component: DashboardPage,
 });
+
+function VendorWorkspaceRedirect() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    void navigate({
+      to: "/dashboard/$section",
+      params: { section: "medical-vendors" },
+      replace: true,
+    });
+  }, [navigate]);
+
+  return (
+    <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">
+      <Loader2 className="size-6 animate-spin" />
+    </div>
+  );
+}
 
 function DashboardPage() {
   const pathname = useRouterState({
@@ -87,6 +106,8 @@ function DashboardPage() {
       return <DoctorDashboard ctx={ctx} />;
     case "insurance":
       return <InsuranceWorkspace ctx={ctx} />;
+    case "medical_vendor":
+      return <VendorWorkspaceRedirect />;
     default:
       return <OperationalStaffDashboard ctx={ctx} />;
   }

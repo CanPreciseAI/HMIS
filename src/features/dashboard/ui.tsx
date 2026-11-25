@@ -106,6 +106,8 @@ const STATUS_TONES: Record<string, string> = {
   closed: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   delivered: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   sent: "bg-sky-50 text-sky-700 ring-sky-200",
+  dispatched: "bg-amber-50 text-amber-700 ring-amber-200",
+  collected: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   received: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   cancelled: "bg-rose-50 text-rose-700 ring-rose-200",
   no_show: "bg-rose-50 text-rose-700 ring-rose-200",
@@ -115,6 +117,11 @@ const STATUS_TONES: Record<string, string> = {
   busy: "bg-amber-50 text-amber-700 ring-amber-200",
   on_leave: "bg-sky-50 text-sky-700 ring-sky-200",
   off_duty: "bg-muted text-muted-foreground ring-border",
+  inactive: "bg-muted text-muted-foreground ring-border",
+  matched: "bg-sky-50 text-sky-700 ring-sky-200",
+  partially_received: "bg-amber-50 text-amber-700 ring-amber-200",
+  disputed: "bg-rose-50 text-rose-700 ring-rose-200",
+  voided: "bg-muted text-muted-foreground ring-border",
 };
 
 export function StatusPill({ status }: { status: string }) {

@@ -448,12 +448,12 @@ export function DashboardShell({
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-6xl">
               {children}
-              <ActionHistory ctx={ctx} />
+              {ctx.role !== "medical_vendor" && <ActionHistory ctx={ctx} />}
             </div>
           </main>
         </div>
       </div>
-      <ArogyaBot ctx={ctx} />
+      {ctx.role !== "medical_vendor" && <ArogyaBot ctx={ctx} />}
     </div>
   );
 }

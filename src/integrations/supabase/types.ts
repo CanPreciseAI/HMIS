@@ -3838,6 +3838,7 @@ export type Database = {
           submitted_at: string;
           tenant_id: string | null;
           user_id: string;
+          vendor_name: string | null;
         };
         Insert: {
           email: string;
@@ -3851,6 +3852,7 @@ export type Database = {
           submitted_at?: string;
           tenant_id?: string | null;
           user_id: string;
+          vendor_name?: string | null;
         };
         Update: {
           email?: string;
@@ -3864,6 +3866,7 @@ export type Database = {
           submitted_at?: string;
           tenant_id?: string | null;
           user_id?: string;
+          vendor_name?: string | null;
         };
         Relationships: [];
       };
@@ -4449,6 +4452,39 @@ export type Database = {
         Relationships: [];
       };
 
+      vendor_medicine_inventory: {
+        Row: {
+          created_at: string;
+          id: string;
+          medicine_id: string;
+          notes: string | null;
+          quantity_available: number;
+          unit: string;
+          updated_at: string;
+          vendor_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          medicine_id: string;
+          notes?: string | null;
+          quantity_available?: number;
+          unit?: string;
+          updated_at?: string;
+          vendor_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          medicine_id?: string;
+          notes?: string | null;
+          quantity_available?: number;
+          unit?: string;
+          updated_at?: string;
+          vendor_id?: string;
+        };
+        Relationships: [];
+      };
       vendors: {
         Row: {
           created_at: string;
@@ -4461,7 +4497,9 @@ export type Database = {
           tax_identifier: string | null;
           tenant_id: string;
           updated_at: string;
+          user_id: string | null;
           vendor_code: string;
+          vendor_type: string;
         };
         Insert: {
           created_at?: string;
@@ -4474,7 +4512,9 @@ export type Database = {
           tax_identifier?: string | null;
           tenant_id: string;
           updated_at?: string;
+          user_id?: string | null;
           vendor_code: string;
+          vendor_type?: string;
         };
         Update: {
           created_at?: string;
@@ -4487,7 +4527,9 @@ export type Database = {
           tax_identifier?: string | null;
           tenant_id?: string;
           updated_at?: string;
+          user_id?: string | null;
           vendor_code?: string;
+          vendor_type?: string;
         };
         Relationships: [];
       };
@@ -4541,7 +4583,11 @@ export type Database = {
       };
       medicine_vendor_orders: {
         Row: {
+          collected_at: string | null;
+          collected_by: string | null;
           created_at: string;
+          dispatch_note: string | null;
+          dispatched_at: string | null;
           facility_id: string;
           id: string;
           medicine_id: string;
@@ -4555,7 +4601,11 @@ export type Database = {
           vendor_id: string;
         };
         Insert: {
+          collected_at?: string | null;
+          collected_by?: string | null;
           created_at?: string;
+          dispatch_note?: string | null;
+          dispatched_at?: string | null;
           facility_id: string;
           id?: string;
           medicine_id: string;
@@ -4569,7 +4619,11 @@ export type Database = {
           vendor_id: string;
         };
         Update: {
+          collected_at?: string | null;
+          collected_by?: string | null;
           created_at?: string;
+          dispatch_note?: string | null;
+          dispatched_at?: string | null;
           facility_id?: string;
           id?: string;
           medicine_id?: string;
@@ -4696,6 +4750,16 @@ export type Database = {
       discharge_ward_patient: {
         Args: { _admission_id: string };
         Returns: undefined;
+      };
+      my_vendor_workspace: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          vendor_id: string;
+          vendor_name: string;
+          vendor_status: string;
+          tenant_id: string;
+          tenant_name: string;
+        }[];
       };
       update_lab_item_status: {
         Args: { _item_id: string; _status: string };
@@ -5161,6 +5225,22 @@ export type Database = {
         };
         Returns: string;
       };
+      vendor_dispatch_medicine_order: {
+        Args: {
+          _note?: string | null;
+          _order_id: string;
+        };
+        Returns: undefined;
+      };
+      collect_medicine_vendor_order: {
+        Args: {
+          _batch_number?: string | null;
+          _expiry_date?: string | null;
+          _location_id?: string | null;
+          _order_id: string;
+        };
+        Returns: undefined;
+      };
       my_employment: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -5237,7 +5317,8 @@ export type Database = {
         | "nurse"
         | "lab_technician"
         | "pharmacist"
-        | "receptionist";
+        | "receptionist"
+        | "medical_vendor";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -5373,6 +5454,7 @@ export const Constants = {
         "lab_technician",
         "pharmacist",
         "receptionist",
+        "medical_vendor",
       ],
     },
   },

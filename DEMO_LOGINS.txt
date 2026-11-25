@@ -39,6 +39,9 @@ INSURANCE
   insurance3@gmail.com     Kavita Rane            Administration   9845012353   DUM-INS-3
   insurance4@gmail.com     Ajay Bhat              General          9845012354   DUM-INS-4
   insurance5@gmail.com     Nisha Fernandes        Administration   9845012355   DUM-INS-5
+MEDICAL VENDOR (medical vendors dashboard only)
+  medicalvendor1@gmail.com  City Pharma            Apollo Hospital          —   VND-MWONV8JW-1FP8
+
 PLATFORM ADMINISTRATOR
   prajvalakka021@gmail.com Prajval Akka           All hospitals            —   EMP-0001
 

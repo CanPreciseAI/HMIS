@@ -67,15 +67,17 @@ export function AdminDashboard({ ctx }: { ctx: StaffContext }) {
   const [approvals, setApprovals] = useState<ApprovalRow[] | null>(null);
 
   const notifiedRequestIds = useRef(new Set<string>());
+  const [liveRetry, setLiveRetry] = useState(0);
 
   const pending = approvals ?? data?.approvals ?? [];
 
   useEffect(() => {
     if (ctx.role !== "hospital_admin" || !ctx.tenantId) return;
 
+    let retryTimer: number | undefined;
     const tenantId = ctx.tenantId;
     const channel = supabase
-      .channel(`staff-approvals-${ctx.userId}`)
+      .channel(`staff-approvals-${ctx.userId}-${liveRetry}`)
       .on(
         "postgres_changes",
         {
@@ -158,19 +160,29 @@ export function AdminDashboard({ ctx }: { ctx: StaffContext }) {
         },
       )
       .subscribe((status, subscriptionError) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.error(
-            "Staff approval notifications could not connect",
-            subscriptionError ?? status,
-          );
-          toast.error("Live staff approval notifications are unavailable.");
+        if (status !== "CHANNEL_ERROR" && status !== "TIMED_OUT") return;
+
+        console.error(
+          "Staff approval notifications could not connect",
+          subscriptionError ?? status,
+        );
+        if (liveRetry >= 5) {
+          toast.error("Live staff approval notifications are unavailable.", {
+            id: "staff-approvals-live",
+          });
+          return;
         }
+        retryTimer = window.setTimeout(
+          () => setLiveRetry((attempt) => attempt + 1),
+          Math.min(1000 * 2 ** liveRetry, 15000),
+        );
       });
 
     return () => {
+      window.clearTimeout(retryTimer);
       void supabase.removeChannel(channel);
     };
-  }, [ctx.role, ctx.tenantId, ctx.userId]);
+  }, [ctx.role, ctx.tenantId, ctx.userId, liveRetry]);
 
   useEffect(() => {
     if (ctx.role !== "hospital_admin" || !ctx.tenantId) return;

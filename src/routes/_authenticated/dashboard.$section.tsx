@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   BedDouble,
+  Boxes,
   Building2,
   CalendarDays,
   CalendarRange,
@@ -10,6 +11,7 @@ import {
   ClipboardList,
   FileText,
   FlaskConical,
+  History,
   Loader2,
   NotebookPen,
   Pill,
@@ -20,6 +22,7 @@ import {
   ShieldCheck,
   TestTubes,
   Trash2,
+  Truck,
   UserCheck,
   Users,
   Warehouse,
@@ -101,6 +104,7 @@ import {
   LabResultsReviewPanel,
   SampleQueuePanel,
 } from "@/features/dashboard/lab-workflow";
+import { MedicalVendorsPanel } from "@/features/dashboard/medical-vendors";
 import { PatientApprovals } from "@/features/dashboard/patient-approvals";
 import { ReceptionAdmissionsPanel } from "@/features/dashboard/reception-admissions";
 import { DoctorAppointmentsPanel } from "@/features/dashboard/doctor-appointments";
@@ -138,6 +142,11 @@ type Section =
   | "ward-capacity"
   | "departments"
   | "medicine-catalog"
+  | "medical-vendors"
+  | "vendor-orders"
+  | "vendor-dispatches"
+  | "vendor-inventory"
+  | "vendor-history"
   | "health-records"
   | "billing"
   | "staff-approvals"
@@ -197,6 +206,31 @@ const SECTION_DETAILS: Record<
     role: ["hospital_admin"],
     title: "Medicine catalog",
     subtitle: "Maintain the shared medicine reference for your hospital.",
+  },
+  "medical-vendors": {
+    role: ["hospital_admin", "medical_vendor"],
+    title: "Medical vendors",
+    subtitle: "Suppliers, medicine orders, dispatches, inventory and payables.",
+  },
+  "vendor-orders": {
+    role: ["medical_vendor"],
+    title: "Orders",
+    subtitle: "Medicine orders this hospital has placed with you.",
+  },
+  "vendor-dispatches": {
+    role: ["medical_vendor"],
+    title: "Dispatches",
+    subtitle: "Orders you have dispatched and the hospital has collected.",
+  },
+  "vendor-inventory": {
+    role: ["medical_vendor"],
+    title: "Medicine inventory",
+    subtitle: "Medicines and quantities you currently hold.",
+  },
+  "vendor-history": {
+    role: ["medical_vendor"],
+    title: "History",
+    subtitle: "Everything you have provided to this hospital.",
   },
   "health-records": {
     role: ["hospital_admin", "doctor", "nurse"],
@@ -370,6 +404,8 @@ type MedicineCatalogSectionData = {
   medicineCatalog: MedicineCatalogEntry[];
 };
 
+type VendorSectionData = { medicalVendors: true };
+
 type WardBedsSectionData = {
   wardBeds: WardBed[];
 };
@@ -411,6 +447,11 @@ const NAV: Record<StaffContext["role"], NavItem[]> = {
       label: "Stock & medicines",
       href: "/dashboard/medicine-catalog",
       icon: Pill,
+    },
+    {
+      label: "Medical vendors",
+      href: "/dashboard/medical-vendors",
+      icon: Truck,
     },
     { label: "Billing", href: "/dashboard/service-charges", icon: Receipt },
     {
@@ -489,6 +530,33 @@ const NAV: Record<StaffContext["role"], NavItem[]> = {
       icon: UserCheck,
     },
     { label: "Billing", href: "/dashboard/service-charges", icon: Receipt },
+  ],
+  medical_vendor: [
+    {
+      label: "Supplier profile",
+      href: "/dashboard/medical-vendors",
+      icon: Building2,
+    },
+    {
+      label: "Orders",
+      href: "/dashboard/vendor-orders",
+      icon: ClipboardList,
+    },
+    {
+      label: "Dispatches",
+      href: "/dashboard/vendor-dispatches",
+      icon: Truck,
+    },
+    {
+      label: "Medicine inventory",
+      href: "/dashboard/vendor-inventory",
+      icon: Boxes,
+    },
+    {
+      label: "History",
+      href: "/dashboard/vendor-history",
+      icon: History,
+    },
   ],
   insurance: [
     { label: "Overview", href: "/dashboard", icon: ShieldCheck },
@@ -642,6 +710,7 @@ function DashboardSectionPage() {
     | WardBedsSectionData
     | WardSectionData
     | InsuranceData
+    | VendorSectionData
     | { healthRecords: true }
     | null
   >(null);
@@ -651,6 +720,7 @@ function DashboardSectionPage() {
     string | null
   >(null);
   const notifiedRequestIds = useRef(new Set<string>());
+  const [approvalLiveRetry, setApprovalLiveRetry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -671,59 +741,66 @@ function DashboardSectionPage() {
         const result =
           rawSection === "health-records"
             ? { healthRecords: true as const }
-            : [
-                  "service-charges",
-                  "billing",
-                  "invoices",
-                  "reception-billing",
-                ].includes(rawSection)
-              ? await loadFacilityInvoices(staffContext)
-              : rawSection === "ward-capacity" && staffContext.role !== "admin"
-                ? staffContext.role === "hospital_admin"
-                  ? await loadAdminData(staffContext)
-                  : await loadWardSectionData(staffContext)
-                : staffContext.role === "admin"
-                  ? rawSection === "hospital-admin-approvals"
-                    ? await loadHospitalAdminRequests()
-                    : rawSection === "hospital-records"
-                      ? await loadPlatformHospitalRecords()
-                      : rawSection === "staff-records"
-                        ? await loadPlatformStaffRecords()
-                        : null
-                  : staffContext.role === "hospital_admin"
-                    ? rawSection === "medicine-catalog"
-                      ? {
-                          medicineCatalog: await loadMedicineCatalog(
-                            staffContext.tenantId ?? "",
-                          ),
-                        }
-                      : await loadHospitalAdminSectionData(
-                          staffContext,
-                          rawSection,
-                        )
-                    : staffContext.role === "doctor"
-                      ? rawSection === "invoices"
-                        ? await loadFacilityInvoices(staffContext)
-                        : await loadDoctorData(staffContext)
-                      : staffContext.role === "nurse"
+            : rawSection === "medical-vendors" ||
+                rawSection === "vendor-orders" ||
+                rawSection === "vendor-dispatches" ||
+                rawSection === "vendor-inventory" ||
+                rawSection === "vendor-history"
+              ? { medicalVendors: true as const }
+              : [
+                    "service-charges",
+                    "billing",
+                    "invoices",
+                    "reception-billing",
+                  ].includes(rawSection)
+                ? await loadFacilityInvoices(staffContext)
+                : rawSection === "ward-capacity" &&
+                    staffContext.role !== "admin"
+                  ? staffContext.role === "hospital_admin"
+                    ? await loadAdminData(staffContext)
+                    : await loadWardSectionData(staffContext)
+                  : staffContext.role === "admin"
+                    ? rawSection === "hospital-admin-approvals"
+                      ? await loadHospitalAdminRequests()
+                      : rawSection === "hospital-records"
+                        ? await loadPlatformHospitalRecords()
+                        : rawSection === "staff-records"
+                          ? await loadPlatformStaffRecords()
+                          : null
+                    : staffContext.role === "hospital_admin"
+                      ? rawSection === "medicine-catalog"
+                        ? {
+                            medicineCatalog: await loadMedicineCatalog(
+                              staffContext.tenantId ?? "",
+                            ),
+                          }
+                        : await loadHospitalAdminSectionData(
+                            staffContext,
+                            rawSection,
+                          )
+                      : staffContext.role === "doctor"
                         ? rawSection === "invoices"
                           ? await loadFacilityInvoices(staffContext)
-                          : await loadNurseData(staffContext)
-                        : staffContext.role === "lab_technician"
+                          : await loadDoctorData(staffContext)
+                        : staffContext.role === "nurse"
                           ? rawSection === "invoices"
                             ? await loadFacilityInvoices(staffContext)
-                            : await loadLabTechnicianData(staffContext)
-                          : staffContext.role === "pharmacist"
+                            : await loadNurseData(staffContext)
+                          : staffContext.role === "lab_technician"
                             ? rawSection === "invoices"
                               ? await loadFacilityInvoices(staffContext)
-                              : await loadPharmacistData(staffContext)
-                            : staffContext.role === "receptionist"
-                              ? rawSection === "reception-billing"
+                              : await loadLabTechnicianData(staffContext)
+                            : staffContext.role === "pharmacist"
+                              ? rawSection === "invoices"
                                 ? await loadFacilityInvoices(staffContext)
-                                : await loadReceptionistData(staffContext)
-                              : staffContext.role === "insurance"
-                                ? await loadInsuranceData(staffContext)
-                                : null;
+                                : await loadPharmacistData(staffContext)
+                              : staffContext.role === "receptionist"
+                                ? rawSection === "reception-billing"
+                                  ? await loadFacilityInvoices(staffContext)
+                                  : await loadReceptionistData(staffContext)
+                                : staffContext.role === "insurance"
+                                  ? await loadInsuranceData(staffContext)
+                                  : null;
         if (!result)
           throw new Error("No dashboard modules are configured for your role.");
         if (!cancelled) setData(result);
@@ -751,9 +828,10 @@ function DashboardSectionPage() {
     if (ctx?.role !== "hospital_admin" || !ctx.tenantId || !isAdminDataLoaded)
       return;
 
+    let retryTimer: number | undefined;
     const tenantId = ctx.tenantId;
     const channel = supabase
-      .channel(`dashboard-staff-approvals-${ctx.userId}`)
+      .channel(`dashboard-staff-approvals-${ctx.userId}-${approvalLiveRetry}`)
       .on(
         "postgres_changes",
         {
@@ -849,19 +927,36 @@ function DashboardSectionPage() {
         },
       )
       .subscribe((status, subscriptionError) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.error(
-            "Staff approval notifications could not connect",
-            subscriptionError ?? status,
-          );
-          toast.error("Live staff approval notifications are unavailable.");
+        if (status !== "CHANNEL_ERROR" && status !== "TIMED_OUT") return;
+
+        console.error(
+          "Staff approval notifications could not connect",
+          subscriptionError ?? status,
+        );
+        if (approvalLiveRetry >= 5) {
+          toast.error("Live staff approval notifications are unavailable.", {
+            id: "staff-approvals-live",
+          });
+          return;
         }
+        retryTimer = window.setTimeout(
+          () => setApprovalLiveRetry((attempt) => attempt + 1),
+          Math.min(1000 * 2 ** approvalLiveRetry, 15000),
+        );
       });
 
     return () => {
+      window.clearTimeout(retryTimer);
       void supabase.removeChannel(channel);
     };
-  }, [ctx?.role, ctx?.tenantId, ctx?.userId, isAdminDataLoaded, navigate]);
+  }, [
+    ctx?.role,
+    ctx?.tenantId,
+    ctx?.userId,
+    isAdminDataLoaded,
+    navigate,
+    approvalLiveRetry,
+  ]);
 
   useEffect(() => {
     if (ctx?.role !== "admin" || !Array.isArray(data)) return;
@@ -1028,14 +1123,16 @@ function DashboardSectionPage() {
   const approvals = data && "approvals" in data ? data.approvals : [];
   const hospitalRequests = isHospitalAdminRequestList(data) ? data : [];
   const notificationsForBell: AdminNotification[] =
-    ctx.role === "hospital_admin" ||
-    ctx.role === "receptionist" ||
-    ctx.role === "doctor"
-      ? (extraNotifications ??
-        (data && "notifications" in data ? data.notifications : []))
-      : data
-        ? buildOverviewNotifications(ctx.role, data)
-        : [];
+    ctx.role === "medical_vendor"
+      ? []
+      : ctx.role === "hospital_admin" ||
+          ctx.role === "receptionist" ||
+          ctx.role === "doctor"
+        ? (extraNotifications ??
+          (data && "notifications" in data ? data.notifications : []))
+        : data
+          ? buildOverviewNotifications(ctx.role, data)
+          : [];
   const sectionNotifications =
     section && data ? buildSectionNotifications(rawSection, data) : [];
   const notificationItems = [
@@ -1114,6 +1211,7 @@ function SectionContent({
     | WardBedsSectionData
     | WardSectionData
     | InsuranceData
+    | VendorSectionData
     | { healthRecords: true };
   ctx: StaffContext;
   reviewingHospitalRequest: string | null;
@@ -1122,6 +1220,25 @@ function SectionContent({
 }) {
   if (section === "health-records") {
     return <PatientHealthRecords ctx={ctx} />;
+  }
+  if (section === "medical-vendors") {
+    return <MedicalVendorsPanel ctx={ctx} />;
+  }
+  if (
+    section === "vendor-orders" ||
+    section === "vendor-dispatches" ||
+    section === "vendor-inventory" ||
+    section === "vendor-history"
+  ) {
+    return (
+      <MedicalVendorsPanel
+        ctx={ctx}
+        view={
+          section.replace("vendor-", "") as
+            "orders" | "dispatches" | "inventory" | "history"
+        }
+      />
+    );
   }
   if (
     section === "medicine-catalog" &&

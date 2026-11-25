@@ -45,7 +45,8 @@ type Role =
   | "lab_technician"
   | "pharmacist"
   | "receptionist"
-  | "insurance";
+  | "insurance"
+  | "medical_vendor";
 const ROLES: { value: Role; label: string; blurb: string }[] = [
   {
     value: "doctor",
@@ -73,10 +74,15 @@ const ROLES: { value: Role; label: string; blurb: string }[] = [
     label: "Insurance company",
     blurb: "Policies and claims",
   },
+  {
+    value: "medical_vendor",
+    label: "Medical vendor",
+    blurb: "Supplier orders and payables",
+  },
 ];
 
 const needsLicense = (role: Role) =>
-  role !== "receptionist" && role !== "insurance";
+  role !== "receptionist" && role !== "insurance" && role !== "medical_vendor";
 
 const signupSchema = z
   .object({
@@ -89,6 +95,7 @@ const signupSchema = z
         "pharmacist",
         "receptionist",
         "insurance",
+        "medical_vendor",
       ])
       .optional()
       .or(z.literal("")),
@@ -107,6 +114,7 @@ const signupSchema = z
     hospitalName: z.string().trim().max(160),
     specialization: z.string().trim().max(80),
     licenseNumber: z.string().trim().max(40),
+    vendorName: z.string().trim().max(160),
     password: z
       .string()
       .min(8, "Use at least 8 characters")
@@ -137,6 +145,17 @@ const signupSchema = z
         code: z.ZodIssueCode.custom,
         path: ["hospitalName"],
         message: "Enter the hospital name",
+      });
+    }
+    if (
+      data.accountType === "staff" &&
+      data.role === "medical_vendor" &&
+      data.vendorName.trim().length < 2
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["vendorName"],
+        message: "Enter your business or vendor name",
       });
     }
     if (
@@ -187,6 +206,7 @@ type FormState = {
   hospitalName: string;
   specialization: string;
   licenseNumber: string;
+  vendorName: string;
   password: string;
   confirmPassword: string;
 };
@@ -202,6 +222,7 @@ const emptyForm: FormState = {
   hospitalName: "",
   specialization: "",
   licenseNumber: "",
+  vendorName: "",
   password: "",
   confirmPassword: "",
 };
@@ -394,6 +415,7 @@ function AuthPage() {
             department: d.department || null,
             specialization: d.specialization || null,
             license_number: d.licenseNumber || null,
+            vendor_name: d.vendorName || null,
           },
         },
       });
@@ -1043,57 +1065,85 @@ function SignUpForm(props: {
 
         {!isHospitalAdmin && role && (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            {role === "medical_vendor" && (
               <div>
                 <label
                   className="mb-1.5 block text-sm font-medium text-foreground"
-                  htmlFor="department"
+                  htmlFor="vendorName"
                 >
-                  Department{" "}
-                  <span className="font-normal text-muted-foreground">
-                    (optional)
-                  </span>
+                  Vendor / business name
                 </label>
                 <input
-                  id="department"
+                  id="vendorName"
                   type="text"
-                  value={props.form.department}
-                  onChange={(e) => props.onField("department")(e.target.value)}
-                  placeholder="General Medicine"
+                  maxLength={160}
+                  value={props.form.vendorName}
+                  onChange={(e) => props.onField("vendorName")(e.target.value)}
+                  placeholder="City Pharma Distributors"
                   className={`h-11 w-full rounded-xl border bg-card px-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:ring-2 focus:ring-ring/50 ${
-                    props.errors.department
+                    props.errors.vendorName
                       ? "border-destructive"
                       : "border-input"
                   }`}
                 />
-                <FieldError message={props.errors.department} />
+                <FieldError message={props.errors.vendorName} />
               </div>
-              {role === "doctor" && (
+            )}
+            {role !== "medical_vendor" && (
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label
                     className="mb-1.5 block text-sm font-medium text-foreground"
-                    htmlFor="specialization"
+                    htmlFor="department"
                   >
-                    Specialisation
+                    Department{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (optional)
+                    </span>
                   </label>
                   <input
-                    id="specialization"
+                    id="department"
                     type="text"
-                    value={props.form.specialization}
+                    value={props.form.department}
                     onChange={(e) =>
-                      props.onField("specialization")(e.target.value)
+                      props.onField("department")(e.target.value)
                     }
-                    placeholder="Cardiology"
+                    placeholder="General Medicine"
                     className={`h-11 w-full rounded-xl border bg-card px-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:ring-2 focus:ring-ring/50 ${
-                      props.errors.specialization
+                      props.errors.department
                         ? "border-destructive"
                         : "border-input"
                     }`}
                   />
-                  <FieldError message={props.errors.specialization} />
+                  <FieldError message={props.errors.department} />
                 </div>
-              )}
-            </div>
+                {role === "doctor" && (
+                  <div>
+                    <label
+                      className="mb-1.5 block text-sm font-medium text-foreground"
+                      htmlFor="specialization"
+                    >
+                      Specialisation
+                    </label>
+                    <input
+                      id="specialization"
+                      type="text"
+                      value={props.form.specialization}
+                      onChange={(e) =>
+                        props.onField("specialization")(e.target.value)
+                      }
+                      placeholder="Cardiology"
+                      className={`h-11 w-full rounded-xl border bg-card px-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:ring-2 focus:ring-ring/50 ${
+                        props.errors.specialization
+                          ? "border-destructive"
+                          : "border-input"
+                      }`}
+                    />
+                    <FieldError message={props.errors.specialization} />
+                  </div>
+                )}
+              </div>
+            )}
             {needsLicense(role) && (
               <div>
                 <label

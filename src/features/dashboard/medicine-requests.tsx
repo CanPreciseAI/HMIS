@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Loader2, PackagePlus, Plus, Send, Store, Truck } from "lucide-react";
 import { toast } from "sonner";
 import {
+  collectMedicineOrder,
   createMedicineRequest,
+  createMedicineVendorOrder,
   createMedicineVendor,
   loadMedicineCatalog,
   loadMedicineRequests,
@@ -40,6 +42,9 @@ export function MedicineRequestsPanel({ ctx }: { ctx: StaffContext }) {
   const [vendorEmail, setVendorEmail] = useState("");
   const [vendorPhone, setVendorPhone] = useState("");
   const [vendorSaving, setVendorSaving] = useState(false);
+  const [collecting, setCollecting] = useState<MedicineRequestRow | null>(null);
+  const [batchNumber, setBatchNumber] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
 
   const isAdmin = ctx.role === "hospital_admin" || ctx.role === "admin";
   const pendingCount = (rows ?? []).filter(
@@ -94,14 +99,32 @@ export function MedicineRequestsPanel({ ctx }: { ctx: StaffContext }) {
       return;
     }
 
+    if (isAdmin && !vendorId) {
+      toast.error("Choose the medicine vendor to order from.");
+      return;
+    }
+
     setSaving(true);
     try {
-      await createMedicineRequest(ctx, medicineId, qty, note);
+      if (isAdmin) {
+        await createMedicineVendorOrder(ctx, {
+          medicineId,
+          quantity: qty,
+          note,
+          vendorId,
+        });
+        const vendor = vendors.find((item) => item.id === vendorId);
+        toast.success(
+          `Order sent to ${vendor?.name ?? "the vendor"} — it now appears in their Orders section`,
+        );
+      } else {
+        await createMedicineRequest(ctx, medicineId, qty, note);
+        toast.success("Request sent — the hospital admin has been notified");
+      }
       setNote("");
       setQuantity("1");
       setOpen(false);
       await refresh();
-      toast.success("Request sent — the hospital admin has been notified");
     } catch (cause) {
       toast.error(
         cause instanceof Error
@@ -166,6 +189,36 @@ export function MedicineRequestsPanel({ ctx }: { ctx: StaffContext }) {
     }
   }
 
+  async function collect() {
+    if (!collecting?.vendorOrderId) return;
+    if (!expiryDate) {
+      toast.error("Enter the expiry date for the received batch.");
+      return;
+    }
+    setBusyId(collecting.id);
+    try {
+      await collectMedicineOrder(collecting.vendorOrderId, {
+        batchNumber,
+        expiryDate,
+      });
+      await refresh();
+      toast.success(
+        "Collection recorded — stock added to inventory and the order moved to the vendor's history",
+      );
+      setCollecting(null);
+      setBatchNumber("");
+      setExpiryDate("");
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error
+          ? cause.message
+          : "Could not record the collection.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function review(
     row: MedicineRequestRow,
     status: "declined" | "fulfilled",
@@ -199,16 +252,18 @@ export function MedicineRequestsPanel({ ctx }: { ctx: StaffContext }) {
           : "Ask for a medicine that is out of stock or needed urgently. The hospital admin is notified."
       }
       action={
-        isAdmin ? undefined : (
-          <button
-            type="button"
-            onClick={() => setOpen((current) => !current)}
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-          >
-            <PackagePlus className="size-4" />{" "}
-            {open ? "Hide form" : "Request medicine"}
-          </button>
-        )
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+        >
+          <PackagePlus className="size-4" />{" "}
+          {open
+            ? "Hide form"
+            : isAdmin
+              ? "Order from vendor"
+              : "Request medicine"}
+        </button>
       }
     >
       {error && (
@@ -324,13 +379,36 @@ export function MedicineRequestsPanel({ ctx }: { ctx: StaffContext }) {
         </div>
       )}
 
-      {!isAdmin && open && (
+      {open && (
         <form
           onSubmit={(event) => void submit(event)}
           className="mb-4 grid gap-3 rounded-xl border border-border bg-muted/20 p-3 sm:grid-cols-2 xl:grid-cols-4"
         >
+          {isAdmin && (
+            <label className="text-xs font-medium text-foreground sm:col-span-2">
+              Send this order to
+              <select
+                required
+                value={vendorId}
+                onChange={(event) => setVendorId(event.currentTarget.value)}
+                disabled={saving || vendors.length === 0}
+                className={fieldClass}
+              >
+                <option value="">
+                  {vendors.length
+                    ? "Choose a medicine vendor"
+                    : "Add a medicine vendor first"}
+                </option>
+                {vendors.map((vendor) => (
+                  <option key={vendor.id} value={vendor.id}>
+                    {vendor.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="text-xs font-medium text-foreground sm:col-span-2">
-            Medicine needed
+            Medicine
             <select
               required
               value={medicineId}
@@ -351,7 +429,7 @@ export function MedicineRequestsPanel({ ctx }: { ctx: StaffContext }) {
             </select>
           </label>
           <label className="text-xs font-medium text-foreground">
-            Quantity needed
+            Quantity
             <input
               type="number"
               min="1"
@@ -384,7 +462,11 @@ export function MedicineRequestsPanel({ ctx }: { ctx: StaffContext }) {
               ) : (
                 <Send className="size-4" />
               )}
-              {saving ? "Sending…" : "Send request"}
+              {saving
+                ? "Sending…"
+                : isAdmin
+                  ? "Send order to vendor"
+                  : "Send request"}
             </button>
           </div>
         </form>
@@ -427,6 +509,12 @@ export function MedicineRequestsPanel({ ctx }: { ctx: StaffContext }) {
                     Sent to {row.vendorName ?? "the vendor"}
                     {row.sentToVendorAt
                       ? ` · ${new Date(row.sentToVendorAt).toLocaleDateString()}`
+                      : ""}
+                    {row.vendorOrderDispatchedAt
+                      ? ` · dispatched ${new Date(row.vendorOrderDispatchedAt).toLocaleDateString()}`
+                      : ""}
+                    {row.vendorOrderCollectedAt
+                      ? ` · collected ${new Date(row.vendorOrderCollectedAt).toLocaleDateString()}`
                       : ""}
                   </p>
                 )}
@@ -473,20 +561,97 @@ export function MedicineRequestsPanel({ ctx }: { ctx: StaffContext }) {
                     {busyId === row.id ? "Sending…" : "Send to vendor"}
                   </button>
                 )}
-                {isAdmin && row.status === "approved" && row.vendorOrderId && (
-                  <button
-                    type="button"
-                    disabled={busyId !== null}
-                    onClick={() => void review(row, "fulfilled")}
-                    className="h-8 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                  >
-                    Mark fulfilled
-                  </button>
-                )}
+                {isAdmin &&
+                  row.status === "approved" &&
+                  row.vendorOrderId &&
+                  row.vendorOrderStatus !== "collected" && (
+                    <button
+                      type="button"
+                      disabled={busyId !== null}
+                      onClick={() => {
+                        if (row.vendorOrderStatus === "dispatched") {
+                          setCollecting(row);
+                          setBatchNumber("");
+                          setExpiryDate("");
+                        } else {
+                          void review(row, "fulfilled");
+                        }
+                      }}
+                      className="h-8 rounded-lg border border-input px-2.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                    >
+                      {busyId === row.id
+                        ? "Saving…"
+                        : row.vendorOrderStatus === "dispatched"
+                          ? "Mark collected"
+                          : "Mark fulfilled"}
+                    </button>
+                  )}
               </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {collecting && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void collect();
+            }}
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+          >
+            <h3 className="font-display text-base font-semibold text-foreground">
+              Receive collected stock
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {collecting.quantity} units will be added to the hospital
+              inventory when you confirm. The order moves to the vendor’s
+              history.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <label className="text-xs font-medium text-foreground">
+                Batch number (optional)
+                <input
+                  value={batchNumber}
+                  onChange={(event) => setBatchNumber(event.target.value)}
+                  placeholder="Leave blank to use the order number"
+                  disabled={busyId !== null}
+                  className={fieldClass}
+                />
+              </label>
+              <label className="text-xs font-medium text-foreground">
+                Expiry date
+                <input
+                  type="date"
+                  required
+                  value={expiryDate}
+                  onChange={(event) => setExpiryDate(event.target.value)}
+                  disabled={busyId !== null}
+                  className={fieldClass}
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCollecting(null)}
+                disabled={busyId !== null}
+                className="h-9 rounded-lg border border-input px-3 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={busyId !== null || !expiryDate}
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+              >
+                {busyId ? <Loader2 className="size-4 animate-spin" /> : null}
+                {busyId ? "Recording…" : "Confirm collection"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </Panel>
   );

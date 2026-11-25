@@ -13,7 +13,8 @@ export type StaffRole =
   | "nurse"
   | "lab_technician"
   | "pharmacist"
-  | "receptionist";
+  | "receptionist"
+  | "medical_vendor";
 
 export const ROLE_LABELS: Record<StaffRole, string> = {
   admin: "Administrator",
@@ -24,6 +25,7 @@ export const ROLE_LABELS: Record<StaffRole, string> = {
   lab_technician: "Lab technician",
   pharmacist: "Pharmacist",
   receptionist: "Receptionist",
+  medical_vendor: "Medical vendor",
 };
 
 export type StaffContext = {
@@ -352,6 +354,44 @@ export async function loadStaffContext(): Promise<StaffContext | null> {
 
   const employee = employeeRes.data;
 
+  // Vendor accounts are not employees: their hospital comes from the supplier
+  // record linked at approval, not from an employee/department row.
+  if (role === "medical_vendor") {
+    const { data: vendorRows, error: vendorError } = await supabase.rpc(
+      "my_vendor_workspace",
+    );
+    if (vendorError) {
+      throw new Error(
+        `Could not load your vendor workspace: ${vendorError.message}`,
+      );
+    }
+    const vendor = vendorRows?.[0] ?? null;
+    if (!vendor) {
+      throw new Error(
+        "No medical vendor is linked to this account yet. Contact your hospital administrator.",
+      );
+    }
+    return {
+      userId: user.id,
+      email: user.email ?? null,
+      role,
+      fullName:
+        profileRes.data?.full_name ?? user.email?.split("@")[0] ?? "Vendor",
+      phone: profileRes.data?.phone ?? null,
+      licenseNumber: null,
+      specialization: null,
+      tenantName: vendor.tenant_name,
+      tenantId: vendor.tenant_id,
+      facilityName: null,
+      facilityId: null,
+      departmentName: null,
+      designationName: null,
+      employeeCode: null,
+      employeeId: null,
+      availability: null,
+    };
+  }
+
   let facilityId: string | null = null;
   if (employee?.department_id) {
     const { data: dept, error } = await supabase
@@ -508,6 +548,8 @@ export type MedicineRequestRow = {
   vendorName: string | null;
   vendorOrderStatus: string | null;
   sentToVendorAt: string | null;
+  vendorOrderDispatchedAt: string | null;
+  vendorOrderCollectedAt: string | null;
 };
 
 export async function loadMedicineVendors(
@@ -582,7 +624,14 @@ export async function loadMedicineRequests(
 
   const orders = new Map<
     string,
-    { id: string; vendorId: string; status: string; sentAt: string }
+    {
+      id: string;
+      vendorId: string;
+      status: string;
+      sentAt: string;
+      dispatchedAt: string | null;
+      collectedAt: string | null;
+    }
   >();
   const vendorNames = new Map<string, string>();
   const rows = data ?? [];
@@ -590,7 +639,9 @@ export async function loadMedicineRequests(
   if (rows.length > 0) {
     const { data: orderRows, error: orderError } = await supabase
       .from("medicine_vendor_orders")
-      .select("id, request_id, vendor_id, status, sent_at")
+      .select(
+        "id, request_id, vendor_id, status, sent_at, dispatched_at, collected_at",
+      )
       .in(
         "request_id",
         rows.map((row) => row.id),
@@ -625,6 +676,8 @@ export async function loadMedicineRequests(
         vendorId: order.vendor_id,
         status: order.status,
         sentAt: order.sent_at,
+        dispatchedAt: order.dispatched_at,
+        collectedAt: order.collected_at,
       });
     }
   }
@@ -643,6 +696,8 @@ export async function loadMedicineRequests(
       vendorName: order ? (vendorNames.get(order.vendorId) ?? null) : null,
       vendorOrderStatus: order?.status ?? null,
       sentToVendorAt: order?.sentAt ?? null,
+      vendorOrderDispatchedAt: order?.dispatchedAt ?? null,
+      vendorOrderCollectedAt: order?.collectedAt ?? null,
     };
   });
 }
@@ -668,6 +723,49 @@ export async function createMedicineRequest(
   });
   if (error) {
     throw new Error(`Could not send the medicine request: ${error.message}`);
+  }
+}
+
+export async function createMedicineVendorOrder(
+  ctx: StaffContext,
+  input: {
+    medicineId: string;
+    quantity: number;
+    note: string;
+    vendorId: string;
+  },
+): Promise<void> {
+  if (!ctx.tenantId || !ctx.facilityId) {
+    throw new Error("Your workspace is missing its hospital or facility.");
+  }
+  const { data, error } = await supabase
+    .from("medicine_requests")
+    .insert({
+      tenant_id: ctx.tenantId,
+      facility_id: ctx.facilityId,
+      medicine_id: input.medicineId,
+      requested_by: ctx.employeeId,
+      requested_by_user: ctx.userId,
+      quantity: input.quantity,
+      note: input.note.trim() || null,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (error || !data) {
+    throw new Error(
+      `Could not create the medicine order: ${error?.message ?? "unknown error"}`,
+    );
+  }
+
+  const { error: sendError } = await supabase.rpc(
+    "send_medicine_request_to_vendor",
+    { _request_id: data.id, _vendor_id: input.vendorId },
+  );
+  if (sendError) {
+    throw new Error(
+      `The request was created but could not be sent to the vendor: ${sendError.message}`,
+    );
   }
 }
 
@@ -709,6 +807,35 @@ export async function sendMedicineRequestToVendor(
     throw new Error(
       `Could not send the medicine request to the vendor: ${error.message}`,
     );
+  }
+}
+
+/** Vendor marks a medicine order as packed and dispatched to the hospital. */
+export async function dispatchMedicineOrder(
+  orderId: string,
+  note?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("vendor_dispatch_medicine_order", {
+    _order_id: orderId,
+    _note: note?.trim() || null,
+  });
+  if (error) {
+    throw new Error(`Could not mark the order dispatched: ${error.message}`);
+  }
+}
+
+/** Hospital administrator records that a dispatched order was collected. */
+export async function collectMedicineOrder(
+  orderId: string,
+  receipt: { batchNumber: string; expiryDate: string },
+): Promise<void> {
+  const { error } = await supabase.rpc("collect_medicine_vendor_order", {
+    _order_id: orderId,
+    _batch_number: receipt.batchNumber.trim() || null,
+    _expiry_date: receipt.expiryDate,
+  });
+  if (error) {
+    throw new Error(`Could not record the collection: ${error.message}`);
   }
 }
 
